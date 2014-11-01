@@ -19,6 +19,8 @@ ENV_AMPOOPQ_URL = "AMPOOPQ_URL"
 
 AMPOOPQ_URL = os.getenv(ENV_AMPOOPQ_URL)
 
+PREFIX_POOPFS = "poopFS://"
+
 POOPFS_E = "poopFS_exch"
 CODE_E = "code_exch"
 
@@ -63,17 +65,21 @@ class AMPoopQ(object):
         pass
 
     def upload(self, file_path, poopFS_path):
+        if not poopFS_path.startswith(PREFIX_POOPFS):
+            raise ValueError(
+                "poopFS path must start with '{}'".format(PREFIX_POOPFS)
+            )
+        to_path = poopFS_path.replace(PREFIX_POOPFS, "", 1)
         channel = self.connection.channel()
         channel.exchange_declare(exchange=POOPFS_E, type='fanout')
         with open(file_path, "rb") as fp:
             src = fp.read().encode("base64")
-        body = json.dumps({"poopFS_path": poopFS_path, "src": src})
-        print "Uploading '{}' to 'poopFS://{}'...".format(
-            file_path, poopFS_path
-        )
+        body = json.dumps({"poopFS_path": to_path, "src": src})
+
+        print "Uploading '{}' to '{}'...".format(file_path, poopFS_path)
         channel.basic_publish(exchange=POOPFS_E, routing_key='', body=body)
 
-    def run(self, path):
+    def deploy(self, path):
 
         #======================================================================
         # PATH
@@ -97,7 +103,7 @@ class AMPoopQ(object):
             src = data["src"].decode("base64")
             fpath = os.path.join(poopfs_path, fname)
             dirname = os.path.dirname(fpath)
-            print "Receiving '{}'...".format(fname)
+            print "Receiving '{}{}'...".format(PREFIX_POOPFS, fname)
             if not os.path.isdir(dirname):
                 os.makedirs(dirname)
             with open(fpath, "w") as fp:
@@ -136,12 +142,21 @@ def main():
     upload_cmd.set_defaults(func=manage_upload)
 
     # Run Subparse
-    def manage_run(args):
-        poop.run(args.path)
+    def manage_deploy(args):
+        poop.deploy(args.path)
 
-    run_cmd = subparsers.add_parser('run', help='run')
-    run_cmd.add_argument('path', help='file for storage code and poopFS')
-    run_cmd.set_defaults(func=manage_run)
+    deploy_cmd = subparsers.add_parser('deploy', help='Deploy AMPoopQ node')
+    deploy_cmd.add_argument('path', help='file for storage code and poopFS')
+    deploy_cmd.set_defaults(func=manage_deploy)
+
+    # Execute subparse
+    #~ def manage_execute(args):
+        #~ import ipdb; ipdb.set_trace()
+#~
+    #~ run_cmd = subparsers.add_parser('run', help='run')
+    #~ run_cmd.add_argument('path', help='file for storage code and poopFS')
+    #~ run_cmd.set_defaults(func=manage_run)
+
 
     if not AMPOOPQ_URL:
         msg = "Enviroment variable '{}' not found".format(ENV_AMPOOPQ_URL)
@@ -149,9 +164,12 @@ def main():
 
     print "*** Using broker '{}' ***".format(AMPOOPQ_URL)
 
-    poop = AMPoopQ(AMPOOPQ_URL)
-    args = parser.parse_args(sys.argv[1:])
-    args.func(args)
+    try:
+        poop = AMPoopQ(AMPOOPQ_URL)
+        args = parser.parse_args(sys.argv[1:])
+        args.func(args)
+    except Exception as err:
+        parser.error(str(err))
 
 
 
