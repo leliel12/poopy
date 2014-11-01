@@ -9,6 +9,7 @@ import sys
 import uuid
 import codecs
 import traceback
+import time
 
 import pika
 
@@ -25,6 +26,8 @@ PREFIX_POOPFS = "poopFS://"
 
 POOPFS_E = "poopFS_exchange"
 CODE_E = "code_exchange"
+DISCOVER_E = "discover_exchange"
+DISCOVERED_E = "discovered_exchange"
 
 
 #==============================================================================
@@ -96,6 +99,28 @@ class AMPoopQ(object):
             out_file = codecs.open(out_file_path, "w", encoding="utf8")
 
             channel = self.connection.channel()
+            nodes = set()
+
+            #==================================================================
+            # Get the list of nodes
+            #==================================================================
+
+            channel.exchange_declare(exchange=DISCOVER_E, type='fanout')
+            print "Discovering nodes for 10 seconds..."
+            channel.basic_publish(
+                exchange=DISCOVER_E, routing_key='', body="ping"
+            )
+
+            channel.exchange_declare(exchange=DISCOVERED_E, type='fanout')
+            result = channel.queue_declare(exclusive=True)
+            queue_name = result.method.queue
+            channel.queue_bind(exchange=DISCOVERED_E, queue=queue_name)
+
+            deadline = time.time() + 10
+            for things in channel.consume(queue_name):
+                import ipdb; ipdb.set_trace()
+                if time.time() >= deadline:
+                    chanel.stop_consuming()
 
             #==================================================================
             # Distribute Code
@@ -113,6 +138,8 @@ class AMPoopQ(object):
             print "Distributing Code '{}'...".format(script_path)
             channel.basic_publish(exchange=CODE_E, routing_key='', body=body)
 
+
+
         except:
             print "ERROR <----------"
             traceback.print_exc(file=out_file)
@@ -129,6 +156,9 @@ class AMPoopQ(object):
 
     def deploy(self, path):
 
+        myid = uuid.uuid4().hex
+        print "-> My id: ".format(myid)
+
         #======================================================================
         # PATH
         #======================================================================
@@ -140,6 +170,7 @@ class AMPoopQ(object):
         if not os.path.isdir(code_path):
             os.makedirs(code_path)
 
+        channel = self.connection.channel()
 
         #======================================================================
         # DOWNLOAD FILES
@@ -157,7 +188,6 @@ class AMPoopQ(object):
             with open(fpath, "w") as fp:
                 fp.write(src)
 
-        channel = self.connection.channel()
         channel.exchange_declare(exchange=POOPFS_E, type='fanout')
         result = channel.queue_declare(exclusive=True)
         queue_name = result.method.queue
@@ -180,7 +210,6 @@ class AMPoopQ(object):
             with open(fpath, "w") as fp:
                 fp.write(src)
 
-        channel = self.connection.channel()
         channel.exchange_declare(exchange=CODE_E, type='fanout')
         result = channel.queue_declare(exclusive=True)
         queue_name = result.method.queue
@@ -190,7 +219,27 @@ class AMPoopQ(object):
         )
         print "-> code storage at '{}'".format(code_path)
 
-        channel.start_consuming()
+        #======================================================================
+        # DISCOVER
+        #======================================================================
+
+        def discovered_callback(ch, method, properties, body):
+            print "Discovered!!!"
+            channel.exchange_declare(exchange=DISCOVERED_E, type='fanout')
+            channel.basic_publish(
+                exchange=DISCOVERED_E, routing_key='', body=myid
+            )
+
+        channel.exchange_declare(exchange=DISCOVER_E, type='fanout')
+        result = channel.queue_declare(exclusive=True)
+        queue_name = result.method.queue
+        channel.queue_bind(exchange=DISCOVER_E, queue=queue_name)
+        channel.basic_consume(
+            discovered_callback, queue=queue_name, no_ack=False
+        )
+        print "-> Ready to be discovered"
+
+        print channel.start_consuming()
 
 
 #==============================================================================
