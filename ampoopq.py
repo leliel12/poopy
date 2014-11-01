@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import shutil
 import itertools
 import os
 import json
 import argparse
 import sys
+import uuid
+import codecs
+import traceback
 
 import pika
 
@@ -21,8 +23,8 @@ AMPOOPQ_URL = os.getenv(ENV_AMPOOPQ_URL)
 
 PREFIX_POOPFS = "poopFS://"
 
-POOPFS_E = "poopFS_exch"
-CODE_E = "code_exch"
+POOPFS_E = "poopFS_exchange"
+CODE_E = "code_exchange"
 
 
 #==============================================================================
@@ -79,6 +81,52 @@ class AMPoopQ(object):
         print "Uploading '{}' to '{}'...".format(file_path, poopFS_path)
         channel.basic_publish(exchange=POOPFS_E, routing_key='', body=body)
 
+    #==========================================================================
+    # RUN SCRIPTS ON AMPoopQ
+    #==========================================================================
+
+    def run(self, script_path, out_path):
+        out_file = None
+        try:
+            if not os.path.isdir(out_path):
+                os.makedirs(out_path)
+            out_file_path = os.path.join(
+                out_path, "{}.txt".format(uuid.uuid4())
+            )
+            out_file = codecs.open(out_file_path, "w", encoding="utf8")
+
+            channel = self.connection.channel()
+
+            #==================================================================
+            # Distribute Code
+            #==================================================================
+
+            # create a new name for the file
+            file_iname = '{}.py'.format(uuid.uuid4().hex)
+
+            channel.exchange_declare(exchange=CODE_E, type='fanout')
+
+            with open(script_path, "rb") as fp:
+                src = fp.read().encode("base64")
+            body = json.dumps({"file_iname": file_iname, "src": src})
+
+            print "Distributing Code '{}'...".format(script_path)
+            channel.basic_publish(exchange=CODE_E, routing_key='', body=body)
+
+        except:
+            print "ERROR <----------"
+            traceback.print_exc(file=out_file)
+        finally:
+            if out_file:
+                out_file.close()
+            print "Your output: '{}'".format(out_file_path)
+
+
+
+    #==========================================================================
+    # DEPLOY AMPoopQ
+    #==========================================================================
+
     def deploy(self, path):
 
         #======================================================================
@@ -94,7 +142,7 @@ class AMPoopQ(object):
 
 
         #======================================================================
-        # DOWNLOAD CODE
+        # DOWNLOAD FILES
         #======================================================================
 
         def download_callback(ch, method, properties, body):
@@ -117,7 +165,30 @@ class AMPoopQ(object):
         channel.basic_consume(
             download_callback, queue=queue_name, no_ack=False
         )
-        print "poopFS mounted at '{}'".format(poopfs_path)
+        print "-> poopFS mounted at '{}'".format(poopfs_path)
+
+        #======================================================================
+        # RECEIVE CODE
+        #======================================================================
+
+        def receive_code_callback(ch, method, properties, body):
+            data = json.loads(body)
+            fname = data["file_iname"]
+            src = data["src"].decode("base64")
+            fpath = os.path.join(code_path, fname)
+            print "Recieving code '{}'...".format(fname)
+            with open(fpath, "w") as fp:
+                fp.write(src)
+
+        channel = self.connection.channel()
+        channel.exchange_declare(exchange=CODE_E, type='fanout')
+        result = channel.queue_declare(exclusive=True)
+        queue_name = result.method.queue
+        channel.queue_bind(exchange=CODE_E, queue=queue_name)
+        channel.basic_consume(
+            receive_code_callback, queue=queue_name, no_ack=False
+        )
+        print "-> code storage at '{}'".format(code_path)
 
         channel.start_consuming()
 
@@ -135,13 +206,12 @@ def main():
     def manage_upload(args):
         poop.upload(args.file_path, args.poopFS_path)
 
-
     upload_cmd = subparsers.add_parser('upload', help='upload file to poopFS')
     upload_cmd.add_argument('file_path', help='file to upload')
     upload_cmd.add_argument('poopFS_path', help='file path to upload')
     upload_cmd.set_defaults(func=manage_upload)
 
-    # Run Subparse
+    # Deploy Subparse
     def manage_deploy(args):
         poop.deploy(args.path)
 
@@ -149,14 +219,14 @@ def main():
     deploy_cmd.add_argument('path', help='file for storage code and poopFS')
     deploy_cmd.set_defaults(func=manage_deploy)
 
-    # Execute subparse
-    #~ def manage_execute(args):
-        #~ import ipdb; ipdb.set_trace()
-#~
-    #~ run_cmd = subparsers.add_parser('run', help='run')
-    #~ run_cmd.add_argument('path', help='file for storage code and poopFS')
-    #~ run_cmd.set_defaults(func=manage_run)
+    # Run subparse
+    def manage_run(args):
+        poop.run(args.script, args.out)
 
+    run_cmd = subparsers.add_parser('run', help='run script on AMPoopQ')
+    run_cmd.add_argument('script', help='script to run')
+    run_cmd.add_argument('out', help='output directory')
+    run_cmd.set_defaults(func=manage_run)
 
     if not AMPOOPQ_URL:
         msg = "Enviroment variable '{}' not found".format(ENV_AMPOOPQ_URL)
