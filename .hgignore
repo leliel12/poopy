@@ -1,0 +1,15 @@
+
+syntax: regexp
+^\.project$
+^\.pydevproject$
+^_.*$
+^.*[.](pyc|pyo)$
+^python/dist$
+^python/build$
+^.*/?_ign_
+^.*(.)orig$
+^\.settings$
+^.*[.](db|sqlite|yyf|yjf|json|yaml|yml)$
+
+syntax: glob
+

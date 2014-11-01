@@ -29,6 +29,8 @@ CODE_E = "code_exchange"
 DISCOVER_E = "discover_exchange"
 DISCOVERED_E = "discovered_exchange"
 
+DISCOVER_TIME = 2
+
 
 #==============================================================================
 #
@@ -105,22 +107,27 @@ class AMPoopQ(object):
             # Get the list of nodes
             #==================================================================
 
-            channel.exchange_declare(exchange=DISCOVER_E, type='fanout')
-            print "Discovering nodes for 10 seconds..."
-            channel.basic_publish(
-                exchange=DISCOVER_E, routing_key='', body="ping"
-            )
+            def discovered_callback(ch, method, properties, body):
+                nodes.add(body)
 
             channel.exchange_declare(exchange=DISCOVERED_E, type='fanout')
             result = channel.queue_declare(exclusive=True)
             queue_name = result.method.queue
             channel.queue_bind(exchange=DISCOVERED_E, queue=queue_name)
+            channel.basic_consume(
+                discovered_callback, queue=queue_name, no_ack=False
+            )
 
-            deadline = time.time() + 10
-            for things in channel.consume(queue_name):
-                import ipdb; ipdb.set_trace()
-                if time.time() >= deadline:
-                    chanel.stop_consuming()
+            channel.exchange_declare(exchange=DISCOVER_E, type='fanout')
+            print "Discovering nodes for {} seconds...".format(DISCOVER_TIME)
+            channel.basic_publish(
+                exchange=DISCOVER_E, routing_key='', body="ping"
+            )
+            self.connection.add_timeout(
+                DISCOVER_TIME, channel.stop_consuming
+            )
+            channel.start_consuming()
+
 
             #==================================================================
             # Distribute Code
