@@ -32,8 +32,12 @@ DISCOVER_E = "discover_exchange"
 DISCOVERED_E = "discovered_exchange"
 MAP_E = "map_exchange"
 MAP_RESULT_E = "map_result_exchange"
+REDUCE_E = "reduce_exchange"
+REDUCE_RESULT_E = "reduce_result_exchange"
 
-DISCOVER_TIME = 1
+END_ITERATOR_E = "end_iterator_exchange"
+
+DISCOVER_TIME = 3
 
 
 #==============================================================================
@@ -47,6 +51,15 @@ class MapContext(object):
         self.node_id = node_id
         self.op = op
 
+    def end(self):
+        body = pickle.dumps({
+            "node_id": self.node_id, "op": self.op
+        }).encode("base64")
+        self.channel.exchange_declare(exchange=END_ITERATOR_E, type='fanout')
+        self.channel.basic_publish(
+            exchange=END_ITERATOR_E, routing_key="map", body=body
+        )
+
     def write(self, key, value):
         body = pickle.dumps({
             "key": key, "value": value, "node_id": self.node_id, "op": self.op
@@ -55,8 +68,32 @@ class MapContext(object):
         self.channel.basic_publish(
             exchange=MAP_RESULT_E, routing_key='', body=body
         )
-        print "je"
 
+
+class ReduceContext(object):
+
+    def __init__(self, node_id, op, channel):
+        self.channel = channel
+        self.node_id = node_id
+        self.op = op
+
+    def end(self):
+        body = pickle.dumps({
+            "node_id": self.node_id, "op": self.op
+        }).encode("base64")
+        self.channel.exchange_declare(exchange=END_ITERATOR_E, type='fanout')
+        self.channel.basic_publish(
+            exchange=END_ITERATOR_E, routing_key="reduce", body=body
+        )
+
+    def write(self, value):
+        body = pickle.dumps({
+            "value": value, "node_id": self.node_id, "op": self.op
+        }).encode("base64")
+        self.channel.exchange_declare(exchange=REDUCE_RESULT_E, type='fanout')
+        self.channel.basic_publish(
+            exchange=REDUCE_RESULT_E, routing_key='', body=body
+        )
 
 
 #==============================================================================
@@ -76,11 +113,11 @@ class AMPoopQ(object):
                 "poopFS path must start with '{}'".format(PREFIX_POOPFS)
             )
 
-    def _split_fnames(self, fname, nodes_n):
-        buff = list(fname)
+    def _split(self, values, g_n):
+        buff = list(values)
         random.shuffle(buff)
-        group_size = int(len(buff) / nodes_n)
-        for _ in xrange(nodes_n):
+        group_size = int(len(buff) / g_n)
+        for _ in xrange(g_n):
             group = []
             while len(group) < group_size and buff:
                 group.append(buff.pop())
@@ -176,8 +213,9 @@ class AMPoopQ(object):
 
             print "Spliting files in '{}' groups".format(nodes_n)
             channel.exchange_declare(exchange=MAP_E, type='fanout')
-            for group in self._split_fnames(files, nodes_n):
+            for group in self._split(files, nodes_n):
                 routing_key = nodebuff.pop()
+                print "Execute '{}.map({})...".format(routing_key, group)
                 body = pickle.dumps({
                     "script": file_iname, "files": group,
                     "op": uuid.uuid4().hex
@@ -186,6 +224,103 @@ class AMPoopQ(object):
                     exchange=MAP_E, routing_key=routing_key, body=body
                 )
 
+            #==================================================================
+            # MAP RESPOSES
+            #==================================================================
+
+            map_results = {}
+            def map_result_callback(ch, method, properties, body):
+                data = pickle.loads(body.decode("base64"))
+                key = data["key"]
+                value = data["value"]
+                if key not in map_results:
+                    map_results[key] = []
+                map_results[key].append(value)
+
+            channel.exchange_declare(exchange=MAP_RESULT_E, type='fanout')
+            result = channel.queue_declare(exclusive=True)
+            queue_name = result.method.queue
+            channel.queue_bind(exchange=MAP_RESULT_E, queue=queue_name)
+            channel.basic_consume(
+                map_result_callback, queue=queue_name, no_ack=False
+            )
+
+            ended = set()
+            def end_map_callback(ch, method, properties, body):
+                data = pickle.loads(body.decode("base64"))
+                ended.add(data["node_id"])
+                if ended == nodes:
+                    channel.stop_consuming()
+
+            channel.exchange_declare(exchange=END_ITERATOR_E, type='fanout')
+            result = channel.queue_declare(exclusive=True)
+            queue_name = result.method.queue
+            channel.queue_bind(
+                exchange=END_ITERATOR_E, queue=queue_name, routing_key="map"
+            )
+            channel.basic_consume(
+                end_map_callback, queue=queue_name, no_ack=False
+            )
+
+            channel.start_consuming()
+
+            #==================================================================
+            # REDUCE
+            #==================================================================
+
+            nodebuff = list(nodes)
+
+            print "Spliting map results in '{}' groups".format(nodes_n)
+            channel.exchange_declare(exchange=REDUCE_E, type='fanout')
+            for group in self._split(map_results.keys(), nodes_n):
+                routing_key = nodebuff.pop()
+                expand_group = dict((k, map_results[k]) for k in group)
+                print "Execute '{}.reduce({})...".format(
+                    routing_key, expand_group
+                )
+                body = pickle.dumps({
+                    "script": file_iname, "values": expand_group,
+                    "op": uuid.uuid4().hex
+                }).encode("base64")
+                channel.basic_publish(
+                    exchange=REDUCE_E, routing_key=routing_key, body=body
+                )
+
+            #==================================================================
+            # REDUCE RESPOSES
+            #==================================================================
+
+            def reduce_result_callback(ch, method, properties, body):
+                ipd
+                data = pickle.loads(body.decode("base64"))
+                out_file.write(data["value"] + "\n")
+
+            channel.exchange_declare(exchange=REDUCE_RESULT_E, type='fanout')
+            result = channel.queue_declare(exclusive=True)
+            queue_name = result.method.queue
+            channel.queue_bind(exchange=REDUCE_RESULT_E, queue=queue_name)
+            channel.basic_consume(
+                reduce_result_callback, queue=queue_name, no_ack=False
+            )
+
+            ended = set()
+            def end_reduce_callback(ch, method, properties, body):
+                data = pickle.loads(body.decode("base64"))
+                ended.add(data["node_id"])
+                if ended == nodes:
+                    channel.stop_consuming()
+
+            channel.exchange_declare(exchange=END_ITERATOR_E, type='fanout')
+            result = channel.queue_declare(exclusive=True)
+            queue_name = result.method.queue
+            channel.queue_bind(
+                exchange=END_ITERATOR_E, queue=queue_name, routing_key="reduce"
+            )
+            channel.basic_consume(
+                end_reduce_callback, queue=queue_name, no_ack=False
+            )
+
+            channel.start_consuming()
         except:
             print "ERROR <----------"
             traceback.print_exc(file=out_file)
@@ -295,8 +430,7 @@ class AMPoopQ(object):
                     poopfs_path, fname.replace(PREFIX_POOPFS, "", 1)
                 )
                 if os.path.isfile(fpath):
-                    with open(fpath) as fp:
-                        yield fname, fp
+                    yield fname, open(fpath)
                 else:
                     yield fname, IOError(fname)
 
@@ -308,12 +442,15 @@ class AMPoopQ(object):
             script_path = os.path.join(code_path, script)
             ctx = MapContext(myid, op, channel)
 
-            def empty_map(context, files):
+            def empty_map(c, k, v):
                 print "No map found in {}".format(script)
 
             map_func = runpy.run_path(script_path).get("map", empty_map)
-            for key, value in _load_files(files):
+            gen = _load_files(files)
+            for key, value in gen:
                 map_func(ctx, key, value)
+                time.sleep(1)
+            ctx.end()
 
         channel.exchange_declare(exchange=MAP_E, type='fanout')
         result = channel.queue_declare(exclusive=True)
@@ -324,6 +461,36 @@ class AMPoopQ(object):
         )
         print "-> Ready to receive maps"
 
+        #======================================================================
+        # REDUCE
+        #======================================================================
+
+        def reduce_callback(ch, method, properties, body):
+            data = pickle.loads(body.decode("base64"))
+            op = data["op"]
+            values = data["values"]
+            script = data["script"]
+            script_path = os.path.join(code_path, script)
+            ctx = ReduceContext(myid, op, channel)
+
+            def empty_reduce(c, k, v):
+                print "No reduce found in {}".format(script)
+
+            reduce_func = runpy.run_path(script_path).get("reduce", empty_reduce)
+            gen = values.items()
+            for key, value in gen:
+                reduce_func(ctx, key, value)
+                time.sleep(1)
+            ctx.end()
+
+        channel.exchange_declare(exchange=REDUCE_E, type='fanout')
+        result = channel.queue_declare(exclusive=True)
+        queue_name = result.method.queue
+        channel.queue_bind(exchange=REDUCE_E, queue=queue_name, routing_key=myid)
+        channel.basic_consume(
+            reduce_callback, queue=queue_name, no_ack=False
+        )
+        print "-> Ready to receive reduces"
 
         print channel.start_consuming()
 
@@ -375,9 +542,6 @@ def main():
     poop = AMPoopQ(AMPOOPQ_URL)
     args = parser.parse_args(sys.argv[1:])
     args.func(args)
-
-
-
 
 
 if __name__ == "__main__":

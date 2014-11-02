@@ -1,4 +1,8 @@
 
 def map(ctx, key, value):
-    print key, type(value)
     ctx.write(1, 2)
+
+
+def reduce(ctx, key, value):
+    ctx.write("hola mundo")
+
