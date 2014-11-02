@@ -3,13 +3,15 @@
 
 import itertools
 import os
-import json
+import runpy
 import argparse
 import sys
 import uuid
 import codecs
 import traceback
 import time
+import random
+import pickle
 
 import pika
 
@@ -28,29 +30,33 @@ POOPFS_E = "poopFS_exchange"
 CODE_E = "code_exchange"
 DISCOVER_E = "discover_exchange"
 DISCOVERED_E = "discovered_exchange"
+MAP_E = "map_exchange"
+MAP_RESULT_E = "map_result_exchange"
 
-DISCOVER_TIME = 2
+DISCOVER_TIME = 1
 
 
 #==============================================================================
 #
 #==============================================================================
 
-class Context(object):
+class MapContext(object):
 
-    def __init__(self):
-        self.buff = []
-        self.seek = 0
+    def __init__(self, node_id, op, channel):
+        self.channel = channel
+        self.node_id = node_id
+        self.op = op
 
-    def write(self, obj):
-        self.buff.append(obj)
+    def write(self, key, value):
+        body = pickle.dumps({
+            "key": key, "value": value, "node_id": self.node_id, "op": self.op
+        }).encode("base64")
+        self.channel.exchange_declare(exchange=MAP_RESULT_E, type='fanout')
+        self.channel.basic_publish(
+            exchange=MAP_RESULT_E, routing_key='', body=body
+        )
+        print "je"
 
-    def read(self, n=1):
-        reads = 0
-        while n < reads:
-            yield self.buff[self.seek]
-            n += 1
-            self.seek += 1
 
 
 #==============================================================================
@@ -63,25 +69,37 @@ class AMPoopQ(object):
         self.conn_str = conn_str
         self.params = pika.URLParameters(conn_str)
         self.connection = pika.BlockingConnection(self.params)
-        self.map_context = Context()
-        self.reduce_context = Context()
-        self.mappers = []
-        self.reducers = []
 
-    def connect_nodes(self):
-        pass
-
-    def upload(self, file_path, poopFS_path):
+    def _validate_poopfs_filename(self, poopFS_path):
         if not poopFS_path.startswith(PREFIX_POOPFS):
             raise ValueError(
                 "poopFS path must start with '{}'".format(PREFIX_POOPFS)
             )
+
+    def _split_fnames(self, fname, nodes_n):
+        buff = list(fname)
+        random.shuffle(buff)
+        group_size = int(len(buff) / nodes_n)
+        for _ in xrange(nodes_n):
+            group = []
+            while len(group) < group_size and buff:
+                group.append(buff.pop())
+            if len(buff) == 1:
+                group.extend(buff)
+            yield tuple(group)
+        if buff:
+            yield tuple(buff)
+
+    def upload(self, file_path, poopFS_path):
+        self._validate_poopfs_filename(poopFS_path)
         to_path = poopFS_path.replace(PREFIX_POOPFS, "", 1)
         channel = self.connection.channel()
         channel.exchange_declare(exchange=POOPFS_E, type='fanout')
         with open(file_path, "rb") as fp:
-            src = fp.read().encode("base64")
-        body = json.dumps({"poopFS_path": to_path, "src": src})
+            src = fp.read()
+        body = pickle.dumps({
+            "poopFS_path": to_path, "src": src
+        }).encode("base64")
 
         print "Uploading '{}' to '{}'...".format(file_path, poopFS_path)
         channel.basic_publish(exchange=POOPFS_E, routing_key='', body=body)
@@ -90,16 +108,20 @@ class AMPoopQ(object):
     # RUN SCRIPTS ON AMPoopQ
     #==========================================================================
 
-    def run(self, script_path, out_path):
+    def run(self, script_path, out_path, files=None):
         out_file = None
         try:
+            # clean files
+            files = frozenset(files) if files else ()
+            map(self._validate_poopfs_filename, files)
+
+            # prepare the output
             if not os.path.isdir(out_path):
                 os.makedirs(out_path)
-            out_file_path = os.path.join(
-                out_path, "{}.txt".format(uuid.uuid4())
-            )
+            out_file_path = os.path.join(out_path, uuid.uuid4().hex + ".txt")
             out_file = codecs.open(out_file_path, "w", encoding="utf8")
 
+            # prepare chanel
             channel = self.connection.channel()
             nodes = set()
 
@@ -128,7 +150,6 @@ class AMPoopQ(object):
             )
             channel.start_consuming()
 
-
             #==================================================================
             # Distribute Code
             #==================================================================
@@ -139,13 +160,31 @@ class AMPoopQ(object):
             channel.exchange_declare(exchange=CODE_E, type='fanout')
 
             with open(script_path, "rb") as fp:
-                src = fp.read().encode("base64")
-            body = json.dumps({"file_iname": file_iname, "src": src})
+                src = fp.read()
+            body = pickle.dumps({
+                "file_iname": file_iname, "src": src
+            }).encode("base64")
 
             print "Distributing Code '{}'...".format(script_path)
             channel.basic_publish(exchange=CODE_E, routing_key='', body=body)
 
+            #==================================================================
+            # MAP
+            #==================================================================
+            nodes_n = len(nodes)
+            nodebuff = list(nodes)
 
+            print "Spliting files in '{}' groups".format(nodes_n)
+            channel.exchange_declare(exchange=MAP_E, type='fanout')
+            for group in self._split_fnames(files, nodes_n):
+                routing_key = nodebuff.pop()
+                body = pickle.dumps({
+                    "script": file_iname, "files": group,
+                    "op": uuid.uuid4().hex
+                }).encode("base64")
+                channel.basic_publish(
+                    exchange=MAP_E, routing_key=routing_key, body=body
+                )
 
         except:
             print "ERROR <----------"
@@ -153,7 +192,7 @@ class AMPoopQ(object):
         finally:
             if out_file:
                 out_file.close()
-            print "Your output: '{}'".format(out_file_path)
+                print "Your output: '{}'".format(out_file_path)
 
 
 
@@ -184,9 +223,9 @@ class AMPoopQ(object):
         #======================================================================
 
         def download_callback(ch, method, properties, body):
-            data = json.loads(body)
+            data = pickle.loads(body.decode("base64"))
             fname = data["poopFS_path"]
-            src = data["src"].decode("base64")
+            src = data["src"]
             fpath = os.path.join(poopfs_path, fname)
             dirname = os.path.dirname(fpath)
             print "Receiving '{}{}'...".format(PREFIX_POOPFS, fname)
@@ -209,9 +248,9 @@ class AMPoopQ(object):
         #======================================================================
 
         def receive_code_callback(ch, method, properties, body):
-            data = json.loads(body)
+            data = pickle.loads(body.decode("base64"))
             fname = data["file_iname"]
-            src = data["src"].decode("base64")
+            src = data["src"]
             fpath = os.path.join(code_path, fname)
             print "Recieving code '{}'...".format(fname)
             with open(fpath, "w") as fp:
@@ -246,6 +285,46 @@ class AMPoopQ(object):
         )
         print "-> Ready to be discovered"
 
+        #======================================================================
+        # MAP
+        #======================================================================
+
+        def _load_files(files):
+            for fname in files:
+                fpath = os.path.join(
+                    poopfs_path, fname.replace(PREFIX_POOPFS, "", 1)
+                )
+                if os.path.isfile(fpath):
+                    with open(fpath) as fp:
+                        yield fname, fp
+                else:
+                    yield fname, IOError(fname)
+
+        def map_callback(ch, method, properties, body):
+            data = pickle.loads(body.decode("base64"))
+            op = data["op"]
+            files = data["files"]
+            script = data["script"]
+            script_path = os.path.join(code_path, script)
+            ctx = MapContext(myid, op, channel)
+
+            def empty_map(context, files):
+                print "No map found in {}".format(script)
+
+            map_func = runpy.run_path(script_path).get("map", empty_map)
+            for key, value in _load_files(files):
+                map_func(ctx, key, value)
+
+        channel.exchange_declare(exchange=MAP_E, type='fanout')
+        result = channel.queue_declare(exclusive=True)
+        queue_name = result.method.queue
+        channel.queue_bind(exchange=MAP_E, queue=queue_name, routing_key=myid)
+        channel.basic_consume(
+            map_callback, queue=queue_name, no_ack=False
+        )
+        print "-> Ready to receive maps"
+
+
         print channel.start_consuming()
 
 
@@ -277,11 +356,14 @@ def main():
 
     # Run subparse
     def manage_run(args):
-        poop.run(args.script, args.out)
+        poop.run(args.script, args.out, args.files)
 
     run_cmd = subparsers.add_parser('run', help='run script on AMPoopQ')
     run_cmd.add_argument('script', help='script to run')
     run_cmd.add_argument('out', help='output directory')
+    run_cmd.add_argument(
+        '--files', nargs='+', help='files of poopFS to process', default=()
+    )
     run_cmd.set_defaults(func=manage_run)
 
     if not AMPOOPQ_URL:
@@ -290,12 +372,10 @@ def main():
 
     print "*** Using broker '{}' ***".format(AMPOOPQ_URL)
 
-    try:
-        poop = AMPoopQ(AMPOOPQ_URL)
-        args = parser.parse_args(sys.argv[1:])
-        args.func(args)
-    except Exception as err:
-        parser.error(str(err))
+    poop = AMPoopQ(AMPOOPQ_URL)
+    args = parser.parse_args(sys.argv[1:])
+    args.func(args)
+
 
 
 
