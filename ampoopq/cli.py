@@ -91,9 +91,7 @@ def main():
     # Run subparse
     def manage_run(args):
         args.connection, lconf
-        queue = multiprocessing.Queue()
-        rnodes = pong_node.RemoteNodesQueueWrapper(queue, lconf)
-        pong_sub = pong_node.PongSubscriber(args.connection, lconf, queue)
+        pong_sub = pong_node.PongSubscriber(args.connection, lconf)
         pong_sub.start()
 
         import ipdb; ipdb.set_trace()

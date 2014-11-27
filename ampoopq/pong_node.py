@@ -40,21 +40,20 @@ PONG_E = "pong_exchange"
 # CLASS
 #==============================================================================
 
-class RemoteNodesQueueWrapper(object):
+class PongSubscriber(multiprocessing.Process):
 
-    def __init__(self, queue, lconf):
-        self.queue = queue
-        self.lconf = lconf
+    def __init__(self, connection, conf, *args, **kwargs):
+        super(PongSubscriber, self).__init__(*args, **kwargs)
+        self.connection = connection
+        self.lconf = conf
+        self._queue = multiprocessing.Queue()
         self._buff = {}
 
     def reload_buff(self):
-        try:
-            while self.queue.qsize:
-                itime, data = self.queue.get_nowait().split("::", 1)
-                rconf = conf.loads(data)
-                self._buff[rconf.UUID] = (float(itime), rconf)
-        except Empty:
-            pass
+        while self._queue.qsize():
+            itime, data = self._queue.get_nowait().split("::", 1)
+            rconf = conf.loads(data)
+            self._buff[rconf.UUID] = (float(itime), rconf)
 
     def uuids(self):
         self.reload_buff()
@@ -69,19 +68,9 @@ class RemoteNodesQueueWrapper(object):
         if self.is_node_alive(uuid):
             return self._buff[uuid][1]
 
-
-class PongSubscriber(multiprocessing.Process):
-
-    def __init__(self, connection, conf, queue, *args, **kwargs):
-        super(PongSubscriber, self).__init__(*args, **kwargs)
-
-        self.connection = connection
-        self.lconf = conf
-        self.queue = queue
-
     def run(self):
         def callback(ch, method, properties, body):
-            self.queue.put_nowait("{}::{}".format(time.time(), body))
+            self._queue.put_nowait("{}::{}".format(time.time(), body))
         self.connection.exchange_consume(PONG_E, callback)
 
 
