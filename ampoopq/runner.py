@@ -11,7 +11,7 @@
 # DOCS
 #==============================================================================
 
-"""Connection base class
+"""Implementation of execution node of AMPoopQ
 
 """
 
@@ -20,6 +20,17 @@
 # IMPORTS
 #==============================================================================
 
+import os
+import runpy
+import uuid
+import codecs
+import multiprocessing
+
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
 import pika
 
 
@@ -27,17 +38,12 @@ import pika
 # CLASS
 #==============================================================================
 
-class AMPoopQConnection(pika.BlockingConnection):
+class ExcecutionCallbacks(object):
 
-    def __init__(self, conn_str, *args, **kwargs):
-        self.conn_str = conn_str
-        self.params = pika.URLParameters(conn_str)
-        super(AMPoopQConnection, self).__init__(self.params, *args, **kwargs)
+    def __init__(self, conf):
+        self.conf = conf
 
-    def exchange_consume(self, exchange, callback):
-        channel = self.channel()
-        channel.exchange_declare(exchange=exchange, type='fanout')
-        result = channel.queue_declare(exclusive=True)
-        queue_name = result.method.queue
-        channel.queue_bind(exchange=exchange, queue=queue_name)
-        channel.basic_consume(callback, queue=queue_name, no_ack=False)
+
+
+
+class ExecutionNode(multiprocessing.Process): pass

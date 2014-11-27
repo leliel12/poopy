@@ -25,6 +25,11 @@ import uuid
 import json
 import collections
 
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
 
 #==============================================================================
 # CONSTANTS
@@ -69,13 +74,13 @@ def conf(**kwargs):
     return cls(**data)
 
 
-def dumps(conbj):
-    data = conf._asdict()
+def dumps(confobj):
+    data = confobj._asdict()
     return pickle.dumps(data).encode("base64")
 
 
-def loads(cobj):
-    data = pickle.loads(data.decode("base64"))
+def loads(stream):
+    data = pickle.loads(stream.decode("base64"))
     return conf(**data)
 
 

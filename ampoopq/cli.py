@@ -34,14 +34,40 @@ import pickle
 import logging
 
 from . import PRJ, STR_VERSION
-from . import conf
+from . import conf, connection, pong_node, execution_node
 
+
+#==============================================================================
+# CONSTANTS
+#==============================================================================
+
+
+logger = logging.getLogger(PRJ)
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter(
+    '[%(levelname)s|%(asctime)s] %(name)s > %(message)s'
+)
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
+
+#==============================================================================
+# FUNCTIONS
+#==============================================================================
 
 def main():
-    parser = argparse.ArgumentParser(
-        prog=PRJ, version=STR_VERSION
+    lconf = conf.conf_from_file()
+
+    parser = argparse.ArgumentParser(prog=PRJ, version=STR_VERSION)
+
+    # Global Options
+    parser.add_argument(
+        'connection', help="AMPQ URL", type=connection.AMPoopQConnection
     )
-    subparsers = parser.add_subparsers(help='Commands help')
+
+    subparsers = parser.add_subparsers(help="Commands help")
 
     # Upload subparse
     #~ def manage_upload(args):
@@ -54,7 +80,11 @@ def main():
 
     # Deploy Subparse
     def manage_deploy(args):
-        poop.deploy()
+        logger.info("Starting Pong on {}".format(args.connection.conn_str))
+        node = pong_node.PongPublisher(args.connection, lconf)
+        node.start()
+
+
 
     deploy_cmd = subparsers.add_parser('deploy', help='Deploy AMPoopQ node')
     deploy_cmd.set_defaults(func=manage_deploy)
@@ -71,7 +101,6 @@ def main():
     #~ )
     #~ run_cmd.set_defaults(func=manage_run)
 
-    #~ poop = AMPoopQ(AMPOOPQ_URL)
     args = parser.parse_args(sys.argv[1:])
     args.func(args)
 

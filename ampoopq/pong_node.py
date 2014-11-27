@@ -22,6 +22,7 @@
 
 import time
 import multiprocessing
+from Queue import Empty
 
 import pika
 
@@ -39,45 +40,59 @@ PONG_E = "pong_exchange"
 # CLASS
 #==============================================================================
 
-class PongCallback(object):
+class MPUUIDs(object):
 
-    def __init__(self, connection, conf):
-        self.connection = conf
-        self.lconf = conf
-        self.nodes = {}
+    def __init__(self, queue):
+        self.queue = queue
+        self._buff = {}
 
-        # connection
-        connection.exchange_consume(PONG_E, self)
+    def _reload(self):
+        try:
+            while True:
+                ruuid, itime, rconf = self.queue.get()
+                self._buff[ruuid] = (itime, rconf)
+        except Empty:
+            pass
 
-    def is_alive(self, uuid):
-        if uuid in self.nodes and self.nodes[uuid][0] <= self.lconf.TTL:
+    def is_node_alive(self, uuid):
+        self._reload()
+        if uuid in self._buff and self._buff[uuid][0] <= self.lconf.TTL:
             return True
 
-    def get(self, uuid):
-        if self.is_alive(uuid):
-            return self.nodes[uuid][1]
+    def get_node_conf(self, uuid):
+        if self.is_node_alive(uuid):
+            return self._buff[uuid][1]
 
-    def __call__(self, ch, method, properties, body):
-        remote_conf = conf.loads(body)
-        self.nodes[remote_conf.UUID] = (time.time(), remote_conf)
 
+class PongListerner(multiprocessing.Process):
+
+    def __init__(self, connection, conf, queue, *args, **kwargs):
+        super(PongListener, self).__init__(*args, **kwargs)
+
+        self.connection = connection
+        self.lconf = conf
+        self.queue = queue
+
+    def run(self):
+        def callback(ch, method, properties, body):
+            remote_conf = conf.loads(body)
+            self.queue.put_nowait((remote_conf.UUID, time.time(), remote_conf))
+        connection.exchange_consume(PONG_E, callback)
 
 
 class PongPublisher(multiprocessing.Process):
 
     def __init__(self, connection, conf, *args, **kwargs):
         super(PongPublisher, self).__init__(*args, **kwargs)
-        self.connection = conf
+        self.connection = connection
         self.lconf = conf
 
     def run(self):
         channel = self.connection.channel()
         channel.exchange_declare(exchange=PONG_E, type='fanout')
-        body = conf.dumps(self.conf)
+        body = conf.dumps(self.lconf)
         while True:
-            channel.basic_publish(
-                exchange=PONG_E, routing_key='', body=body
-            )
+            channel.basic_publish(exchange=PONG_E, routing_key='', body=body)
             time.sleep(self.lconf.SLEEP)
 
 
