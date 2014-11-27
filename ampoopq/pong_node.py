@@ -40,22 +40,28 @@ PONG_E = "pong_exchange"
 # CLASS
 #==============================================================================
 
-class MPUUIDs(object):
+class RemoteNodesQueueWrapper(object):
 
-    def __init__(self, queue):
+    def __init__(self, queue, lconf):
         self.queue = queue
+        self.lconf = lconf
         self._buff = {}
 
-    def _reload(self):
+    def reload_buff(self):
         try:
-            while True:
-                ruuid, itime, rconf = self.queue.get()
-                self._buff[ruuid] = (itime, rconf)
+            while self.queue.qsize:
+                itime, data = self.queue.get_nowait().split("::", 1)
+                rconf = conf.loads(data)
+                self._buff[rconf.UUID] = (float(itime), rconf)
         except Empty:
             pass
 
+    def uuids(self):
+        self.reload_buff()
+        return [k for k in self._buff.keys() if self.is_node_alive(k)]
+
     def is_node_alive(self, uuid):
-        self._reload()
+        self.reload_buff()
         if uuid in self._buff and self._buff[uuid][0] <= self.lconf.TTL:
             return True
 
@@ -64,10 +70,10 @@ class MPUUIDs(object):
             return self._buff[uuid][1]
 
 
-class PongListerner(multiprocessing.Process):
+class PongSubscriber(multiprocessing.Process):
 
     def __init__(self, connection, conf, queue, *args, **kwargs):
-        super(PongListener, self).__init__(*args, **kwargs)
+        super(PongSubscriber, self).__init__(*args, **kwargs)
 
         self.connection = connection
         self.lconf = conf
@@ -75,9 +81,8 @@ class PongListerner(multiprocessing.Process):
 
     def run(self):
         def callback(ch, method, properties, body):
-            remote_conf = conf.loads(body)
-            self.queue.put_nowait((remote_conf.UUID, time.time(), remote_conf))
-        connection.exchange_consume(PONG_E, callback)
+            self.queue.put_nowait("{}::{}".format(time.time(), body))
+        self.connection.exchange_consume(PONG_E, callback)
 
 
 class PongPublisher(multiprocessing.Process):

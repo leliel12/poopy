@@ -41,3 +41,4 @@ class AMPoopQConnection(pika.BlockingConnection):
         queue_name = result.method.queue
         channel.queue_bind(exchange=exchange, queue=queue_name)
         channel.basic_consume(callback, queue=queue_name, no_ack=False)
+        channel.start_consuming()
