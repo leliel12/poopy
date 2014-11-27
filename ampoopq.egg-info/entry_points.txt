@@ -1,0 +1,3 @@
+[console_scripts]
+ampoopq = ampoopq.cli:main
+

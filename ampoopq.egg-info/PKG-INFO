@@ -1,0 +1,14 @@
+Metadata-Version: 1.1
+Name: ampoopq
+Version: 0.2
+Summary: Pure Python implementation of Map-Reduce over AMPQ (rabitMQ)
+Home-page: UNKNOWN
+Author: JuanBC
+Author-email: jbc.develop@gmail.com
+License: WISKEY-WARE
+Description: UNKNOWN
+Keywords: ampq rabitmq map reduce
+Platform: UNKNOWN
+Classifier: Topic :: Utilities
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python :: 2
