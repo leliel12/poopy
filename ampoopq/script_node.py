@@ -61,10 +61,10 @@ class ScriptSuscriber(multiprocessing.Process):
     def _callback(self, ch, method, properties, body):
         data = serializer.loads(body)
         fname = data["filename"]
-        finame = data["fileiname"]
+        ifname = data["ifilename"]
         src = data["src"]
-        logger.info("Receiving {}".format(foname))
-        fpath = os.path.join(self.lconf.SCRIPTS, finame)
+        logger.info("Receiving {} ({})".format(fname, ifname))
+        fpath = os.path.join(self.lconf.SCRIPTS, ifname)
         with open(fpath, "w") as fp:
             fp.write(src)
 
@@ -90,8 +90,9 @@ class ScriptPublisher(multiprocessing.Process):
             src = fp.read()
         body = serializer.dumps({
             "filename": os.path.basename(self.filepath),
-            "fileiname": self.fileiname, "src": src
+            "ifilename": self.ifilename, "src": src
         })
         conn = connection.AMPoopQConnection(self.conn)
+        channel = conn.channel()
         channel.exchange_declare(exchange=SCRIPT_E, type='fanout')
         channel.basic_publish(exchange=SCRIPT_E, routing_key='', body=body)

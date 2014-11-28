@@ -32,6 +32,7 @@ import time
 import random
 import pickle
 import multiprocessing
+import contextlib
 
 from . import PRJ, STR_VERSION
 from . import conf, connection, pong_node, poopfs_node, script_node
@@ -48,6 +49,24 @@ logger = conf.getLogger()
 # FUNCTIONS
 #==============================================================================
 
+@contextlib.contextmanager
+def proccontext():
+    """This context manager store the process to be killed after end
+    of execution of the end of the block
+
+    """
+    procs = set()
+    try:
+        yield procs
+    finally:
+        logger.info("Killing {} processes..".format(len(procs)))
+        for proc in procs:
+            try:
+                proc.terminate()
+            except Exception as err:
+                logger.warning(err)
+
+
 def main():
     lconf = conf.conf_from_file()
 
@@ -63,25 +82,21 @@ def main():
     #==========================================================================
 
     def manage_upload(args):
-        pong_sub, popfs_pub = None, None
-        try:
+        with proccontext() as ctx:
             conn = args.connection
             logger.info("Start discover nodes...")
             pong_sub = pong_node.PongSubscriber(conn, lconf)
+            ctx.add(pong_sub)
             pong_sub.start()
+
 
             logger.info("Start uploading file...")
             poopfs_pub = poopfs_node.PoopFSPublisher(
                 conn, lconf, args.filepath, args.poopFSpath
             )
+            ctx.add(poopfs_pub)
             poopfs_pub.start()
             poopfs_pub.join()
-        finally:
-            logger.info("Killing processes..")
-            if pong_sub:
-                pong_sub.terminate()
-            if popfs_pub:
-                poopfs_pub.terminate()
 
 
     upload_cmd = subparsers.add_parser('upload', help='upload file to poopFS')
@@ -94,22 +109,27 @@ def main():
     #==========================================================================
 
     def manage_deploy(args):
-        conn = args.connection
+        with proccontext() as ctx:
+            conn = args.connection
 
-        msg = "Start announce my existence..."
-        logger.info(msg)
-        pong_pub = pong_node.PongPublisher(conn, lconf)
-        pong_pub.start()
+            msg = "Starting poopFS on '{}'..."
+            logger.info(msg.format(lconf.POOP_FS))
+            poopfs_sub = poopfs_node.PoopFSSuscriber(conn, lconf)
+            ctx.add(poopfs_sub)
+            poopfs_sub.start()
 
-        msg = "Starting poopFS on '{}'..."
-        logger.info(msg.format(lconf.POOP_FS))
-        poopfs_sub = poopfs_node.PoopFSSuscriber(conn, lconf)
-        poopfs_sub.start()
+            msg = "Starting scripts deployment storage on '{}'..."
+            logger.info(msg.format(lconf.SCRIPTS))
+            script_sub = script_node.ScriptSuscriber(conn, lconf)
+            ctx.add(script_sub)
+            script_sub.start()
 
-        msg = "Starting scripts deployment storage on '{}'..."
-        logger.info(msg.format(lconf.SCRIPTS))
-        script_sub = script_node.ScriptSuscriber(conn, lconf)
-        script_sub.start()
+            msg = "Start announce my existence..."
+            logger.info(msg)
+            pong_pub = pong_node.PongPublisher(conn, lconf)
+            ctx.add(pong_pub)
+            pong_pub.start()
+            pong_pub.join()
 
     deploy_cmd = subparsers.add_parser('deploy', help='Deploy AMPoopQ node')
     deploy_cmd.set_defaults(func=manage_deploy)
@@ -119,20 +139,23 @@ def main():
     #==========================================================================
 
     def manage_run(args):
-        conn = args.connection
-        logger.info("Start discover nodes...")
-        pong_sub = pong_node.PongSubscriber(conn, lconf)
-        pong_sub.start()
+        with proccontext() as ctx:
+            conn = args.connection
+            logger.info("Start discover nodes...")
+            pong_sub = pong_node.PongSubscriber(conn, lconf)
+            ctx.add(pong_sub)
+            pong_sub.start()
 
-        logger.info("Deploy script...")
-        iname = "{}.py".format(uuid.uuid4().hex)
-        script_pub = script_node.ScriptPublisher(
-            conn, lconf, args.script, iname
-        )
-        script_pub.start()
-        script_pub.join()
-        script_pub.terminate()
-
+            logger.info("Deploy script...")
+            iname = "i{}_{}".format(
+                uuid.uuid4().hex, os.path.basename(args.script)
+            )
+            script_pub = script_node.ScriptPublisher(
+                conn, lconf, args.script, iname
+            )
+            ctx.add(script_pub)
+            script_pub.start()
+            script_pub.join()
 
     run_cmd = subparsers.add_parser('run', help='run script on AMPoopQ')
     run_cmd.add_argument('script', help='script to run')
