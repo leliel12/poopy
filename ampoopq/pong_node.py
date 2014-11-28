@@ -70,7 +70,7 @@ class PongSubscriber(multiprocessing.Process):
             return self._buff[uuid][1]
 
     # callback
-    def _callback_pong(self, ch, method, properties, body):
+    def _callback(self, ch, method, properties, body):
         if self._queue.qsize() == 0:
             self._oldtimes = []
         for oldtime in tuple(self._oldtimes):
@@ -83,7 +83,7 @@ class PongSubscriber(multiprocessing.Process):
 
     def run(self):
         conn = connection.AMPoopQConnection(self.conn)
-        conn.exchange_consume(PONG_E, self._callback_pong)
+        conn.exchange_consume(PONG_E, self._callback)
 
 
 class PongPublisher(multiprocessing.Process):
@@ -94,15 +94,16 @@ class PongPublisher(multiprocessing.Process):
         self.lconf = conf
 
     def run(self):
-        conn = connection.AMPoopQConnection(self.conn)
-        channel = conn.channel()
-        channel.exchange_declare(exchange=PONG_E, type='fanout')
-        body = serializer.dumps(self.lconf._asdict())
         logger.info(
             "Announcing myself with uuid '{}' every '{}' seconds".format(
                 self.lconf.UUID, self.lconf.SLEEP
             )
         )
+
+        body = serializer.dumps(self.lconf._asdict())
+        conn = connection.AMPoopQConnection(self.conn)
+        channel = conn.channel()
+        channel.exchange_declare(exchange=PONG_E, type='fanout')
         while True:
             channel.basic_publish(exchange=PONG_E, routing_key='', body=body)
             time.sleep(self.lconf.SLEEP)

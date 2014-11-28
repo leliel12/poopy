@@ -34,7 +34,7 @@ import pickle
 import multiprocessing
 
 from . import PRJ, STR_VERSION
-from . import conf, connection, pong_node, poopfs_node
+from . import conf, connection, pong_node, poopfs_node, script_node
 
 
 #==============================================================================
@@ -58,7 +58,10 @@ def main():
 
     subparsers = parser.add_subparsers(help="Commands help")
 
-    # Upload subparse
+    #==========================================================================
+    # UPLOAD SUBPARSE
+    #==========================================================================
+
     def manage_upload(args):
         pong_sub, popfs_pub = None, None
         try:
@@ -86,34 +89,57 @@ def main():
     upload_cmd.add_argument('poopFSpath', help='file path to upload')
     upload_cmd.set_defaults(func=manage_upload)
 
-    # Deploy Subparse
+    #==========================================================================
+    # DEPLOY SUBPARSE
+    #==========================================================================
+
     def manage_deploy(args):
         conn = args.connection
 
-        logger.info("Start announce my existence...")
+        msg = "Start announce my existence..."
+        logger.info(msg)
         pong_pub = pong_node.PongPublisher(conn, lconf)
         pong_pub.start()
 
-        logger.info("Starting poopFS on {}".format(lconf.POOP_FS))
+        msg = "Starting poopFS on '{}'..."
+        logger.info(msg.format(lconf.POOP_FS))
         poopfs_sub = poopfs_node.PoopFSSuscriber(conn, lconf)
         poopfs_sub.start()
+
+        msg = "Starting scripts deployment storage on '{}'..."
+        logger.info(msg.format(lconf.SCRIPTS))
+        script_sub = script_node.ScriptSuscriber(conn, lconf)
+        script_sub.start()
 
     deploy_cmd = subparsers.add_parser('deploy', help='Deploy AMPoopQ node')
     deploy_cmd.set_defaults(func=manage_deploy)
 
-    # Run subparse
+    #==========================================================================
+    # RUN SUBPARSE
+    #==========================================================================
+
     def manage_run(args):
+        conn = args.connection
         logger.info("Start discover nodes...")
         pong_sub = pong_node.PongSubscriber(conn, lconf)
         pong_sub.start()
 
+        logger.info("Deploy script...")
+        iname = "{}.py".format(uuid.uuid4().hex)
+        script_pub = script_node.ScriptPublisher(
+            conn, lconf, args.script, iname
+        )
+        script_pub.start()
+        script_pub.join()
+        script_pub.terminate()
+
 
     run_cmd = subparsers.add_parser('run', help='run script on AMPoopQ')
-    #~ run_cmd.add_argument('script', help='script to run')
-    #~ run_cmd.add_argument('out', help='output directory')
-    #~ run_cmd.add_argument(
-        #~ '--files', nargs='+', help='files of poopFS to process', default=()
-    #~ )
+    run_cmd.add_argument('script', help='script to run')
+    run_cmd.add_argument('out', help='output directory')
+    run_cmd.add_argument(
+        '--files', nargs='+', help='files of poopFS to process', default=()
+    )
     run_cmd.set_defaults(func=manage_run)
 
     args = parser.parse_args(sys.argv[1:])

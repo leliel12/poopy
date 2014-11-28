@@ -40,68 +40,58 @@ from . import connection, serializer, conf
 # CONSTANTS
 #==============================================================================
 
-PREFIX_POOPFS = "poopFS://"
+SCRIPT_E = "script_exchange"
 
-POOPFS_E = "poopFS_exchange"
+logger = conf.getLogger("Scripts")
 
-logger = conf.getLogger("poopFS")
 
 #==============================================================================
 # CLASS
 #==============================================================================
 
-class PoopFSSuscriber(multiprocessing.Process):
+class ScriptSuscriber(multiprocessing.Process):
 
     def __init__(self, conn, conf, *args, **kwargs):
-        super(PoopFSSuscriber, self).__init__(*args, **kwargs)
+        super(ScriptSuscriber, self).__init__(*args, **kwargs)
         self.conn = conn
         self.lconf = conf
-        if not os.path.isdir(conf.POOP_FS):
-            os.makedirs(conf.POOP_FS)
+        if not os.path.isdir(conf.SCRIPTS):
+            os.makedirs(conf.SCRIPTS)
 
     def _callback(self, ch, method, properties, body):
         data = serializer.loads(body)
-        fname = data["poopFSpath"]
+        fname = data["filename"]
+        finame = data["fileiname"]
         src = data["src"]
-        logger.info("Receiving {}{}".format(PREFIX_POOPFS, fname))
-        fpath = os.path.join(self.lconf.POOP_FS, fname)
-        dirname = os.path.dirname(fpath)
-        if not os.path.isdir(dirname):
-            os.makedirs(dirname)
+        logger.info("Receiving {}".format(foname))
+        fpath = os.path.join(self.lconf.SCRIPTS, finame)
         with open(fpath, "w") as fp:
             fp.write(src)
 
     def run(self):
         conn = connection.AMPoopQConnection(self.conn)
-        conn.exchange_consume(POOPFS_E, self._callback)
+        conn.exchange_consume(SCRIPT_E, self._callback)
 
 
-class PoopFSPublisher(multiprocessing.Process):
+class ScriptPublisher(multiprocessing.Process):
 
-    def __init__(self, conn, conf, filepath, poopFSpath, *args, **kwargs):
-        super(PoopFSPublisher, self).__init__(*args, **kwargs)
+    def __init__(self, conn, conf, filepath, ifilename, *args, **kwargs):
+        super(ScriptPublisher, self).__init__(*args, **kwargs)
         self.conn = conn
         self.lconf = conf
         self.filepath = filepath
-        self.poopFSpath = poopFSpath
+        self.ifilename = ifilename
 
-    def _clean_poopfs_filename(self, poopFSpath):
-        if not poopFSpath.startswith(PREFIX_POOPFS):
-            raise ValueError(
-                "poopFS path must start with '{}'".format(PREFIX_POOPFS)
-            )
-        return poopFSpath.replace(PREFIX_POOPFS, "", 1)
 
     def run(self):
-        logger.info(
-            "Upoloading '{}' to '{}'".format(self.filepath, self.poopFSpath)
-        )
-        to_path = self._clean_poopfs_filename(self.poopFSpath)
+        logger.info("Deploying script '{}'".format(self.filepath))
+
         with open(self.filepath, "rb") as fp:
             src = fp.read()
-        body = serializer.dumps({"poopFSpath": to_path, "src": src})
-
+        body = serializer.dumps({
+            "filename": os.path.basename(self.filepath),
+            "fileiname": self.fileiname, "src": src
+        })
         conn = connection.AMPoopQConnection(self.conn)
-        channel = conn.channel()
-        channel.exchange_declare(exchange=POOPFS_E, type='fanout')
-        channel.basic_publish(exchange=POOPFS_E, routing_key='', body=body)
+        channel.exchange_declare(exchange=SCRIPT_E, type='fanout')
+        channel.basic_publish(exchange=SCRIPT_E, routing_key='', body=body)

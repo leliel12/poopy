@@ -47,6 +47,8 @@ CONF_PATH = os.path.join(AMPOOPQ_DIR, "conf.json")
 
 POOP_FS = os.path.join(AMPOOPQ_DIR, "poop_fs")
 
+SCRIPTS = os.path.join(AMPOOPQ_DIR, "scripts")
+
 
 #==============================================================================
 # LOGGER
@@ -71,7 +73,7 @@ def getLogger(name=PRJ):
 # CONFS
 #==============================================================================
 
-def conf_from_file(conf_path=CONF_PATH, poop_fs=POOP_FS):
+def conf_from_file(conf_path=CONF_PATH, poop_fs=POOP_FS, scripts=SCRIPTS):
     data = None
     if not os.path.isdir(os.path.dirname(conf_path)):
         os.makedirs(os.path.dirname(conf_path))
@@ -86,6 +88,7 @@ def conf_from_file(conf_path=CONF_PATH, poop_fs=POOP_FS):
             json.dump(data, fp, indent=2)
     data["CONF_PATH"] = conf_path
     data["POOP_FS"] = poop_fs
+    data["SCRIPTS"] = scripts
     return conf(**data)
 
 
@@ -97,7 +100,8 @@ def conf(**kwargs):
         "UUID": unicode(uuid.uuid4()),
         "TTL": 30,
         "SLEEP": 5,
-        "POOP_FS": None
+        "POOP_FS": None,
+        "SCRIPTS": None
     }
     data.update(kwargs)
     cls = collections.namedtuple("Conf", data.keys())
