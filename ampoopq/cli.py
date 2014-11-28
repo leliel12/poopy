@@ -60,6 +60,7 @@ def main():
 
     # Upload subparse
     def manage_upload(args):
+        pong_sub, popfs_pub = None, None
         try:
             conn = args.connection
             logger.info("Start discover nodes...")
@@ -73,9 +74,11 @@ def main():
             poopfs_pub.start()
             poopfs_pub.join()
         finally:
-            logger.info("Killing process..")
-            pong_sub.terminate()
-            poopfs_pub.terminate()
+            logger.info("Killing processes..")
+            if pong_sub:
+                pong_sub.terminate()
+            if popfs_pub:
+                poopfs_pub.terminate()
 
 
     upload_cmd = subparsers.add_parser('upload', help='upload file to poopFS')
