@@ -35,7 +35,7 @@ import logging
 import multiprocessing
 
 from . import PRJ, STR_VERSION
-from . import conf, connection, pong_node, execution_node
+from . import conf, connection, pong_node, poopfs_node
 
 
 #==============================================================================
@@ -81,9 +81,15 @@ def main():
 
     # Deploy Subparse
     def manage_deploy(args):
-        logger.info("Starting Pong on {}".format(args.connection.conn_str))
-        pong_pub = pong_node.PongPublisher(args.connection, lconf)
+        conn = args.connection
+
+        logger.info("Starting Pong on {}".format(conn.conn_str))
+        pong_pub = pong_node.PongPublisher(conn, lconf)
         pong_pub.start()
+
+        logger.info("Starting poopFS on {}".format(lconf.POOP_FS))
+        poopfs_sub = poopfs_node.PoopFSSuscriber(conn, lconf)
+        poopfs_sub.start()
 
     deploy_cmd = subparsers.add_parser('deploy', help='Deploy AMPoopQ node')
     deploy_cmd.set_defaults(func=manage_deploy)
@@ -93,9 +99,6 @@ def main():
         args.connection, lconf
         pong_sub = pong_node.PongSubscriber(args.connection, lconf)
         pong_sub.start()
-
-        import ipdb; ipdb.set_trace()
-
 
     run_cmd = subparsers.add_parser('run', help='run script on AMPoopQ')
     #~ run_cmd.add_argument('script', help='script to run')

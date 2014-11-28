@@ -33,6 +33,9 @@ except ImportError:
 
 import pika
 
+from . import serializer
+
+
 #==============================================================================
 # CONSTANTS
 #==============================================================================
@@ -46,17 +49,17 @@ POOPFS_E = "poopFS_exchange"
 # CLASS
 #==============================================================================
 
-class ExcecutionCallbacks(object):
+class PoopFSSuscriber(multiprocessing.Process):
 
     def __init__(self, connection, conf, *args, **kwargs):
-        super(ExcecutionCallbacks, self).__init__(*args, **kwargs)
+        super(PoopFSSuscriber, self).__init__(*args, **kwargs)
         self.connection = connection
         self.lconf = conf
-        if not os.path.isdir(lconf.POOP_FS):
-            os.makedirs(lconf.POOP_FS)
+        if not os.path.isdir(conf.POOP_FS):
+            os.makedirs(conf.POOP_FS)
 
     def _callback_poopfs(self, ch, method, properties, body):
-        data = loads(body)
+        data = serializer.loads(body)
         fname = data["poopFS_path"]
         src = data["src"]
         fpath = os.path.join(self.lconf.POOP_FS, fname)
@@ -68,15 +71,3 @@ class ExcecutionCallbacks(object):
 
     def run(self):
         self.connection.exchange_consume(POOPFS_E, self._callback_poopfs)
-
-
-#==============================================================================
-# FUNCTIONS
-#==============================================================================
-
-def loads(stream):
-    return pickle.loads(stream.decode("base64"))
-
-
-def dumps(data):
-    return pickle.dumps(data).encode("base64")

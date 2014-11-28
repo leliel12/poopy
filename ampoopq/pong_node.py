@@ -22,11 +22,8 @@
 
 import time
 import multiprocessing
-from Queue import Empty
 
-import pika
-
-from . import conf
+from . import conf, serializer
 
 
 #==============================================================================
@@ -47,12 +44,13 @@ class PongSubscriber(multiprocessing.Process):
         self.connection = connection
         self.lconf = conf
         self._queue = multiprocessing.Queue()
+        self._oldtimes = []
         self._buff = {}
 
     def reload_buff(self):
         while self._queue.qsize():
             itime, data = self._queue.get_nowait().split("::", 1)
-            rconf = conf.loads(data)
+            rconf = conf.conf(**serializer.loads(data))
             self._buff[rconf.UUID] = (float(itime), rconf)
 
     def uuids(self):
@@ -61,17 +59,29 @@ class PongSubscriber(multiprocessing.Process):
 
     def is_node_alive(self, uuid):
         self.reload_buff()
-        if uuid in self._buff and self._buff[uuid][0] <= self.lconf.TTL:
-            return True
+        return (
+            uuid in self._buff and
+            time.time() - self._buff[uuid][0] < self.lconf.TTL
+        )
 
     def get_node_conf(self, uuid):
         if self.is_node_alive(uuid):
             return self._buff[uuid][1]
 
+    # callback
+    def _callback_pong(self, ch, method, properties, body):
+        if self._queue.qsize() == 0:
+            self._oldtimes = []
+        for oldtime in tuple(self._oldtimes):
+            if time.time() - oldtime > self.lconf.TTL:
+                self._queue.get_nowait()
+                self._oldtimes.remove(oldtime)
+        itime = time.time()
+        self._queue.put_nowait("{}::{}".format(itime, body))
+        self._oldtimes.append(itime)
+
     def run(self):
-        def callback(ch, method, properties, body):
-            self._queue.put_nowait("{}::{}".format(time.time(), body))
-        self.connection.exchange_consume(PONG_E, callback)
+        self.connection.exchange_consume(PONG_E, self._callback_pong)
 
 
 class PongPublisher(multiprocessing.Process):
@@ -84,13 +94,7 @@ class PongPublisher(multiprocessing.Process):
     def run(self):
         channel = self.connection.channel()
         channel.exchange_declare(exchange=PONG_E, type='fanout')
-        body = conf.dumps(self.lconf)
+        body = serializer.dumps(self.lconf._asdict())
         while True:
             channel.basic_publish(exchange=PONG_E, routing_key='', body=body)
             time.sleep(self.lconf.SLEEP)
-
-
-
-
-
-

@@ -35,20 +35,27 @@ except ImportError:
 # CONSTANTS
 #==============================================================================
 
-
 PATH = os.path.abspath(os.path.dirname(__file__))
 
 USER_HOME = os.path.expanduser("~")
 
-CONF_PATH = os.path.join(USER_HOME, ".ampoopq.json")
+AMPOOPQ_DIR = os.path.join(USER_HOME, ".ampoopq")
+
+CONF_PATH = os.path.join(AMPOOPQ_DIR, "conf.json")
+
+POOP_FS = os.path.join(AMPOOPQ_DIR, "poop_fs")
 
 
 #==============================================================================
 # CONFS
 #==============================================================================
 
-def conf_from_file(conf_path=CONF_PATH):
+def conf_from_file(conf_path=CONF_PATH, poop_fs=POOP_FS):
     data = None
+    if not os.path.isdir(os.path.dirname(conf_path)):
+        os.makedirs(os.path.dirname(conf_path))
+    if not os.path.isdir(os.path.dirname(poop_fs)):
+        os.makedirs(os.path.dirname(poop_fs))
     if os.path.exists(conf_path):
         with open(conf_path) as fp:
             data = json.load(fp)
@@ -57,6 +64,7 @@ def conf_from_file(conf_path=CONF_PATH):
         with open(conf_path, "w") as fp:
             json.dump(data, fp, indent=2)
     data["CONF_PATH"] = conf_path
+    data["POOP_FS"] = poop_fs
     return conf(**data)
 
 
@@ -67,24 +75,20 @@ def conf(**kwargs):
         "CONF_PATH": None,
         "UUID": unicode(uuid.uuid4()),
         "TTL": 30,
-        "SLEEP": 10
+        "SLEEP": 5,
+        "POOP_FS": None
     }
     data.update(kwargs)
     cls = collections.namedtuple("Conf", data.keys())
     return cls(**data)
 
 
-def dumps(confobj):
-    data = confobj._asdict()
-    return pickle.dumps(data).encode("base64")
+#==============================================================================
+# MAIN
+#==============================================================================
 
-
-def loads(stream):
-    data = pickle.loads(stream.decode("base64"))
-    return conf(**data)
-
-
-
+if __name__ == "__main__":
+    print(__doc__)
 
 
 
