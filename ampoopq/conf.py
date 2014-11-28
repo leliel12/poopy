@@ -23,6 +23,7 @@
 import os
 import uuid
 import json
+import logging
 import collections
 
 try:
@@ -30,6 +31,7 @@ try:
 except ImportError:
     import pickle
 
+from . import PRJ, STR_VERSION
 
 #==============================================================================
 # CONSTANTS
@@ -44,6 +46,25 @@ AMPOOPQ_DIR = os.path.join(USER_HOME, ".ampoopq")
 CONF_PATH = os.path.join(AMPOOPQ_DIR, "conf.json")
 
 POOP_FS = os.path.join(AMPOOPQ_DIR, "poop_fs")
+
+
+#==============================================================================
+# LOGGER
+#==============================================================================
+
+log_level = logging.DEBUG
+
+def getLogger(name=PRJ):
+    logger = logging.getLogger(name)
+    logger.setLevel(log_level)
+    ch = logging.StreamHandler()
+    ch.setLevel(log_level)
+    formatter = logging.Formatter(
+        '[%(levelname)s|%(asctime)s] %(name)s > %(message)s'
+    )
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    return logger
 
 
 #==============================================================================

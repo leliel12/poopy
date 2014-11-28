@@ -31,7 +31,6 @@ import traceback
 import time
 import random
 import pickle
-import logging
 import multiprocessing
 
 from . import PRJ, STR_VERSION
@@ -42,16 +41,7 @@ from . import conf, connection, pong_node, poopfs_node
 # CONSTANTS
 #==============================================================================
 
-
-logger = logging.getLogger(PRJ)
-logger.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter(
-    '[%(levelname)s|%(asctime)s] %(name)s > %(message)s'
-)
-ch.setFormatter(formatter)
-logger.addHandler(ch)
+logger = conf.getLogger()
 
 
 #==============================================================================
@@ -64,26 +54,40 @@ def main():
     parser = argparse.ArgumentParser(prog=PRJ, version=STR_VERSION)
 
     # Global Options
-    parser.add_argument(
-        'connection', help="AMPQ URL", type=connection.AMPoopQConnection
-    )
+    parser.add_argument('connection', help="AMPQ URL")
 
     subparsers = parser.add_subparsers(help="Commands help")
 
     # Upload subparse
-    #~ def manage_upload(args):
-        #~ poop.upload(args.file_path, args.poopFS_path)
-#~
-    #~ upload_cmd = subparsers.add_parser('upload', help='upload file to poopFS')
-    #~ upload_cmd.add_argument('file_path', help='file to upload')
-    #~ upload_cmd.add_argument('poopFS_path', help='file path to upload')
-    #~ upload_cmd.set_defaults(func=manage_upload)
+    def manage_upload(args):
+        try:
+            conn = args.connection
+            logger.info("Start discover nodes...")
+            pong_sub = pong_node.PongSubscriber(conn, lconf)
+            pong_sub.start()
+
+            logger.info("Start uploading file...")
+            poopfs_pub = poopfs_node.PoopFSPublisher(
+                conn, lconf, args.filepath, args.poopFSpath
+            )
+            poopfs_pub.start()
+            poopfs_pub.join()
+        finally:
+            logger.info("Killing process..")
+            pong_sub.terminate()
+            poopfs_pub.terminate()
+
+
+    upload_cmd = subparsers.add_parser('upload', help='upload file to poopFS')
+    upload_cmd.add_argument('filepath', help='file to upload')
+    upload_cmd.add_argument('poopFSpath', help='file path to upload')
+    upload_cmd.set_defaults(func=manage_upload)
 
     # Deploy Subparse
     def manage_deploy(args):
         conn = args.connection
 
-        logger.info("Starting Pong on {}".format(conn.conn_str))
+        logger.info("Start announce my existence...")
         pong_pub = pong_node.PongPublisher(conn, lconf)
         pong_pub.start()
 
@@ -96,9 +100,10 @@ def main():
 
     # Run subparse
     def manage_run(args):
-        args.connection, lconf
-        pong_sub = pong_node.PongSubscriber(args.connection, lconf)
+        logger.info("Start discover nodes...")
+        pong_sub = pong_node.PongSubscriber(conn, lconf)
         pong_sub.start()
+
 
     run_cmd = subparsers.add_parser('run', help='run script on AMPoopQ')
     #~ run_cmd.add_argument('script', help='script to run')

@@ -33,7 +33,7 @@ except ImportError:
 
 import pika
 
-from . import serializer
+from . import connection, serializer, conf
 
 
 #==============================================================================
@@ -44,6 +44,7 @@ PREFIX_POOPFS = "poopFS://"
 
 POOPFS_E = "poopFS_exchange"
 
+logger = conf.getLogger("poopFS")
 
 #==============================================================================
 # CLASS
@@ -51,17 +52,18 @@ POOPFS_E = "poopFS_exchange"
 
 class PoopFSSuscriber(multiprocessing.Process):
 
-    def __init__(self, connection, conf, *args, **kwargs):
+    def __init__(self, conn, conf, *args, **kwargs):
         super(PoopFSSuscriber, self).__init__(*args, **kwargs)
-        self.connection = connection
+        self.conn = conn
         self.lconf = conf
         if not os.path.isdir(conf.POOP_FS):
             os.makedirs(conf.POOP_FS)
 
     def _callback_poopfs(self, ch, method, properties, body):
         data = serializer.loads(body)
-        fname = data["poopFS_path"]
+        fname = data["poopFSpath"]
         src = data["src"]
+        logger.info("Receiving {}{}".format(PREFIX_POOPFS, fname))
         fpath = os.path.join(self.lconf.POOP_FS, fname)
         dirname = os.path.dirname(fpath)
         if not os.path.isdir(dirname):
@@ -70,4 +72,35 @@ class PoopFSSuscriber(multiprocessing.Process):
             fp.write(src)
 
     def run(self):
-        self.connection.exchange_consume(POOPFS_E, self._callback_poopfs)
+        conn = connection.AMPoopQConnection(self.conn)
+        conn.exchange_consume(POOPFS_E, self._callback_poopfs)
+
+
+class PoopFSPublisher(multiprocessing.Process):
+
+    def __init__(self, conn, conf, filepath, poopFSpath, *args, **kwargs):
+        super(PoopFSPublisher, self).__init__(*args, **kwargs)
+        self.conn = conn
+        self.lconf = conf
+        self.filepath = filepath
+        self.poopFSpath = poopFSpath
+
+    def _clean_poopfs_filename(self, poopFSpath):
+        if not poopFSpath.startswith(PREFIX_POOPFS):
+            raise ValueError(
+                "poopFS path must start with '{}'".format(PREFIX_POOPFS)
+            )
+        return poopFSpath.replace(PREFIX_POOPFS, "", 1)
+
+    def run(self):
+        logger.info(
+            "Upoloading '{}' to '{}'".format(self.filepath, self.poopFSpath)
+        )
+        conn = connection.AMPoopQConnection(self.conn)
+        to_path = self._clean_poopfs_filename(self.poopFSpath)
+        channel = conn.channel()
+        channel.exchange_declare(exchange=POOPFS_E, type='fanout')
+        with open(self.filepath, "rb") as fp:
+            src = fp.read()
+        body = serializer.dumps({"poopFSpath": to_path, "src": src})
+        channel.basic_publish(exchange=POOPFS_E, routing_key='', body=body)

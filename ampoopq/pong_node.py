@@ -23,7 +23,7 @@
 import time
 import multiprocessing
 
-from . import conf, serializer
+from . import connection, conf, serializer
 
 
 #==============================================================================
@@ -32,6 +32,7 @@ from . import conf, serializer
 
 PONG_E = "pong_exchange"
 
+logger = conf.getLogger("Pong")
 
 #==============================================================================
 # CLASS
@@ -39,9 +40,9 @@ PONG_E = "pong_exchange"
 
 class PongSubscriber(multiprocessing.Process):
 
-    def __init__(self, connection, conf, *args, **kwargs):
+    def __init__(self, conn, conf, *args, **kwargs):
         super(PongSubscriber, self).__init__(*args, **kwargs)
-        self.connection = connection
+        self.conn = conn
         self.lconf = conf
         self._queue = multiprocessing.Queue()
         self._oldtimes = []
@@ -81,20 +82,27 @@ class PongSubscriber(multiprocessing.Process):
         self._oldtimes.append(itime)
 
     def run(self):
-        self.connection.exchange_consume(PONG_E, self._callback_pong)
+        conn = connection.AMPoopQConnection(self.conn)
+        conn.exchange_consume(PONG_E, self._callback_pong)
 
 
 class PongPublisher(multiprocessing.Process):
 
-    def __init__(self, connection, conf, *args, **kwargs):
+    def __init__(self, conn, conf, *args, **kwargs):
         super(PongPublisher, self).__init__(*args, **kwargs)
-        self.connection = connection
+        self.conn = conn
         self.lconf = conf
 
     def run(self):
-        channel = self.connection.channel()
+        conn = connection.AMPoopQConnection(self.conn)
+        channel = conn.channel()
         channel.exchange_declare(exchange=PONG_E, type='fanout')
         body = serializer.dumps(self.lconf._asdict())
+        logger.info(
+            "Announcing myself with uuid '{}' every '{}' seconds".format(
+                self.lconf.UUID, self.lconf.SLEEP
+            )
+        )
         while True:
             channel.basic_publish(exchange=PONG_E, routing_key='', body=body)
             time.sleep(self.lconf.SLEEP)
