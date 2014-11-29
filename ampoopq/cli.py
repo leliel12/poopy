@@ -35,7 +35,7 @@ import multiprocessing
 import contextlib
 
 from . import PRJ, STR_VERSION
-from . import conf, connection, pong_node, poopfs_node, script_node
+from . import conf, connection, pong_node, poopfs_node, script_node, script
 
 
 #==============================================================================
@@ -72,10 +72,25 @@ def main():
 
     parser = argparse.ArgumentParser(prog=PRJ, version=STR_VERSION)
 
-    # Global Options
-    parser.add_argument('connection', help="AMPQ URL")
 
     subparsers = parser.add_subparsers(help="Commands help")
+
+    #==========================================================================
+    # Create Empty Script
+    #==========================================================================
+
+    def manage_createscript(args):
+        if os.path.exists(args.filepath):
+            raise IOError("File '{}' already exists".format(args.filepath))
+        with open(args.filepath, "w") as fp:
+            fp.write(script.SCRIPT_TEMPLATE)
+        logger.info("Script created at '{}'".format(args.filepath))
+
+    createscript_cmd = subparsers.add_parser(
+        'createscript', help='Create a new AMPoopQ script'
+    )
+    createscript_cmd.add_argument('filepath', help='file to create ')
+    createscript_cmd.set_defaults(func=manage_createscript)
 
     #==========================================================================
     # UPLOAD SUBPARSE
@@ -100,6 +115,7 @@ def main():
 
 
     upload_cmd = subparsers.add_parser('upload', help='upload file to poopFS')
+    upload_cmd.add_argument('connection', help="AMPQ URL")
     upload_cmd.add_argument('filepath', help='file to upload')
     upload_cmd.add_argument('poopFSpath', help='file path to upload')
     upload_cmd.set_defaults(func=manage_upload)
@@ -132,6 +148,7 @@ def main():
             pong_pub.join()
 
     deploy_cmd = subparsers.add_parser('deploy', help='Deploy AMPoopQ node')
+    deploy_cmd.add_argument('connection', help="AMPQ URL")
     deploy_cmd.set_defaults(func=manage_deploy)
 
     #==========================================================================
@@ -157,12 +174,15 @@ def main():
             script_pub.start()
             script_pub.join()
 
+            logger.info(
+                "Running will start in {} seconds...".format(lconf.SLEEP)
+            )
+            time.sleep(lconf.SLEEP)
+
     run_cmd = subparsers.add_parser('run', help='run script on AMPoopQ')
+    run_cmd.add_argument('connection', help="AMPQ URL")
     run_cmd.add_argument('script', help='script to run')
     run_cmd.add_argument('out', help='output directory')
-    run_cmd.add_argument(
-        '--files', nargs='+', help='files of poopFS to process', default=()
-    )
     run_cmd.set_defaults(func=manage_run)
 
     args = parser.parse_args(sys.argv[1:])

@@ -1,8 +1,12 @@
 
-def map(ctx, key, value):
-    ctx.write(1, 2)
 
 
-def reduce(ctx, key, value):
-    ctx.write("hola mundo")
+def map(mctx, key, value):
+    mctx.write(1, 2)
+
+
+def reduce(rctx, key, value):
+    rctx.write("hola mundo")
+
+
 
