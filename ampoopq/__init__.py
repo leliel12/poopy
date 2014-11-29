@@ -11,7 +11,7 @@
 # DOCS
 #==============================================================================
 
-u"""Pure Python implementation of Map-Reduce over AMPQ (rabitMQ)
+u"""Pure Python implementation of Map-Reduce over AMPQ
 
 """
 
@@ -49,7 +49,7 @@ CLASSIFIERS = (
     "Programming Language :: Python :: 2",
 )
 
-URL = ""
+URL = "http://ampoopq.jbcabral.org"
 
 DOC_URL = ""
 
@@ -62,11 +62,16 @@ EMAIL = "jbc.develop@gmail.com"
 LICENSE = "WISKEY-WARE"
 
 FULL_LICENSE = u""""THE WISKEY-WARE LICENSE":
-<jbc.develop@gmail.com> wrote this file. As long as you retain this notice
+<jbc.develop@gmail.com> wrote this program. As long as you retain this notice
 you can do whatever you want with this stuff. If we meet some day, and you
 think this stuff is worth it, you can buy me a WISKEY in return Juan BC
-
 """
+
+WARRANTY = u"""{}
+This program comes with ABSOLUTELY NO WARRANTY; for details see {}
+""".format(FULL_LICENSE, URL)
+
+
 
 # : Keywords for search of pypi
 KEYWORDS = """ampq rabitmq map reduce"""

@@ -34,7 +34,7 @@ import pickle
 import multiprocessing
 import contextlib
 
-from . import PRJ, STR_VERSION
+from . import PRJ, STR_VERSION, DOC, WARRANTY
 from . import conf, connection, pong_node, poopfs_node, script_node, script
 
 
@@ -70,7 +70,10 @@ def proccontext():
 def main():
     lconf = conf.conf_from_file()
 
-    parser = argparse.ArgumentParser(prog=PRJ, version=STR_VERSION)
+    parser = argparse.ArgumentParser(
+        PRJ, version=STR_VERSION, description=DOC,
+        epilog=WARRANTY
+    )
 
 
     subparsers = parser.add_subparsers(help="Commands help")
