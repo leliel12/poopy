@@ -11,7 +11,7 @@
 # DOCS
 #==============================================================================
 
-"""This file is for distribute AMPoopQ with distutils
+"""This file is for distribute Poopy with distutils
 
 """
 
@@ -35,21 +35,21 @@ if __name__ == "__main__":
 
     from setuptools import setup, find_packages
 
-    import ampoopq
+    import poopy
 
     setup(
-        name=ampoopq.PRJ.lower(),
-        version=ampoopq.STR_VERSION,
-        description=ampoopq.SHORT_DESCRIPTION,
-        author=ampoopq.AUTHOR,
-        author_email=ampoopq.EMAIL,
-        url=ampoopq.URL,
-        license=ampoopq.LICENSE,
-        keywords=ampoopq.KEYWORDS,
-        classifiers=ampoopq.CLASSIFIERS,
-        packages=[pkg for pkg in find_packages() if pkg.startswith("ampoopq")],
+        name=poopy.PRJ.lower(),
+        version=poopy.STR_VERSION,
+        description=poopy.SHORT_DESCRIPTION,
+        author=poopy.AUTHOR,
+        author_email=poopy.EMAIL,
+        url=poopy.URL,
+        license=poopy.LICENSE,
+        keywords=poopy.KEYWORDS,
+        classifiers=poopy.CLASSIFIERS,
+        packages=[pkg for pkg in find_packages() if pkg.startswith("poopy")],
         include_package_data=True,
         py_modules=["ez_setup"],
-        entry_points={'console_scripts': ['ampoopq = ampoopq.cli:main']},
+        entry_points={'console_scripts': ['poopy = poopy.cli:main']},
         install_requires=REQUIREMENTS,
     )

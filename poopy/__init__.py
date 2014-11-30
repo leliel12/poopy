@@ -21,7 +21,7 @@ u"""Pure Python implementation of Map-Reduce over AMPQ
 #==============================================================================
 
 # : This is the project name
-PRJ = "AMPoopQ"
+PRJ = "Poopy"
 
 # : The project version as tuple of strings
 VERSION = ("0", "2")
@@ -49,7 +49,7 @@ CLASSIFIERS = (
     "Programming Language :: Python :: 2",
 )
 
-URL = "http://ampoopq.jbcabral.org"
+URL = "http://poopy.jbcabral.org"
 
 DOC_URL = ""
 

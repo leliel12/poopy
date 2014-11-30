@@ -11,7 +11,7 @@
 # DOCS
 #==============================================================================
 
-"""Script model for ampq
+"""Serializers of Poopy
 
 """
 
@@ -20,53 +20,40 @@
 # IMPORTS
 #==============================================================================
 
-import abc
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 
 #==============================================================================
-# CONSTANTS
+# FUNCTIONS
 #==============================================================================
 
-SCRIPT_TEMPLATE = """
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-from ampoopq import script
+def dump(data, fp):
+    fp.write(dumps(data))
 
 
-class Script(script.ScriptBase):
+def dumps(data):
+    return pickle.dumps(data).encode("base64")
 
-    def map(self, k, v, ctx):
-        raise NotImplementedError()
 
-    def reduce(self, k, v, ctx):
-        raise NotImplementedError()
+def load(stream):
+    return loads(stream.read())
 
-    def setup(self, ctx):
-        raise NotImplementedError()
 
-""".strip()
+def loads(stream):
+    return pickle.loads(stream.decode("base64"))
+
 
 
 #==============================================================================
-# CLASS
+# MAIN
 #==============================================================================
 
-class ScriptBase(object):
+if __name__ == "__main__":
+    print(__doc__)
 
-    __metaclass__ = abc.ABCMeta
-
-    @abc.abstractmethod
-    def map(self, k, v, ctx):
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def reduce(self, k, v, ctx):
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def setup(self, ctx):
-        raise NotImplementedError()
 
 
 

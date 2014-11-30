@@ -11,7 +11,7 @@
 # DOCS
 #==============================================================================
 
-"""AMPoopQ command line interface
+"""Poopy command line interface
 
 """
 
@@ -35,7 +35,7 @@ import multiprocessing
 import contextlib
 
 from . import PRJ, STR_VERSION, DOC, WARRANTY
-from . import conf, connection, pong_node, poopfs_node, script_node, script
+from . import conf, connection, pong_node, poopyfs_node, script_node, script
 
 
 #==============================================================================
@@ -90,7 +90,7 @@ def main():
         logger.info("Script created at '{}'".format(args.filepath))
 
     createscript_cmd = subparsers.add_parser(
-        'createscript', help='Create a new AMPoopQ script'
+        'createscript', help='Create a new Poopy script'
     )
     createscript_cmd.add_argument('filepath', help='file to create ')
     createscript_cmd.set_defaults(func=manage_createscript)
@@ -107,20 +107,19 @@ def main():
             ctx.add(pong_sub)
             pong_sub.start()
 
-
             logger.info("Start uploading file...")
-            poopfs_pub = poopfs_node.PoopFSPublisher(
-                conn, lconf, args.filepath, args.poopFSpath
+            poopyfs_pub = poopyfs_node.PoopyFSPublisher(
+                conn, lconf, args.filepath, args.poopyFSpath
             )
-            ctx.add(poopfs_pub)
-            poopfs_pub.start()
-            poopfs_pub.join()
+            ctx.add(poopyfs_pub)
+            poopyfs_pub.start()
+            poopyfs_pub.join()
 
 
-    upload_cmd = subparsers.add_parser('upload', help='upload file to poopFS')
+    upload_cmd = subparsers.add_parser('upload', help='upload file to poopyFS')
     upload_cmd.add_argument('connection', help="AMPQ URL")
     upload_cmd.add_argument('filepath', help='file to upload')
-    upload_cmd.add_argument('poopFSpath', help='file path to upload')
+    upload_cmd.add_argument('poopyFSpath', help='file path to upload')
     upload_cmd.set_defaults(func=manage_upload)
 
     #==========================================================================
@@ -131,11 +130,11 @@ def main():
         with proccontext() as ctx:
             conn = args.connection
 
-            msg = "Starting poopFS on '{}'..."
-            logger.info(msg.format(lconf.POOP_FS))
-            poopfs_sub = poopfs_node.PoopFSSuscriber(conn, lconf)
-            ctx.add(poopfs_sub)
-            poopfs_sub.start()
+            msg = "Starting poopyFS on '{}'..."
+            logger.info(msg.format(lconf.POOPY_FS))
+            poopyfs_sub = poopyfs_node.PoopyFSSuscriber(conn, lconf)
+            ctx.add(poopyfs_sub)
+            poopyfs_sub.start()
 
             msg = "Starting scripts deployment storage on '{}'..."
             logger.info(msg.format(lconf.SCRIPTS))
@@ -150,7 +149,7 @@ def main():
             pong_pub.start()
             pong_pub.join()
 
-    deploy_cmd = subparsers.add_parser('deploy', help='Deploy AMPoopQ node')
+    deploy_cmd = subparsers.add_parser('deploy', help='Deploy Poopy node')
     deploy_cmd.add_argument('connection', help="AMPQ URL")
     deploy_cmd.set_defaults(func=manage_deploy)
 
@@ -182,7 +181,7 @@ def main():
             )
             time.sleep(lconf.SLEEP)
 
-    run_cmd = subparsers.add_parser('run', help='run script on AMPoopQ')
+    run_cmd = subparsers.add_parser('run', help='run script on Poopy cluster')
     run_cmd.add_argument('connection', help="AMPQ URL")
     run_cmd.add_argument('script', help='script to run')
     run_cmd.add_argument('out', help='output directory')

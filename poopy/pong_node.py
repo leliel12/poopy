@@ -11,7 +11,7 @@
 # DOCS
 #==============================================================================
 
-"""Implementation of execution node of AMPoopQ
+"""Implementation of execution node of Poopy
 
 """
 
@@ -33,6 +33,7 @@ from . import connection, conf, serializer
 PONG_E = "pong_exchange"
 
 logger = conf.getLogger("Pong")
+
 
 #==============================================================================
 # CLASS
@@ -82,7 +83,7 @@ class PongSubscriber(multiprocessing.Process):
         self._oldtimes.append(itime)
 
     def run(self):
-        conn = connection.AMPoopQConnection(self.conn)
+        conn = connection.PoopyConnection(self.conn)
         conn.exchange_consume(PONG_E, self._callback)
 
 
@@ -101,7 +102,7 @@ class PongPublisher(multiprocessing.Process):
         )
 
         body = serializer.dumps(self.lconf._asdict())
-        conn = connection.AMPoopQConnection(self.conn)
+        conn = connection.PoopyConnection(self.conn)
         channel = conn.channel()
         channel.exchange_declare(exchange=PONG_E, type='fanout')
         while True:

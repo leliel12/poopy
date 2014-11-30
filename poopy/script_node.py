@@ -11,7 +11,7 @@
 # DOCS
 #==============================================================================
 
-"""Implementation of execution node of AMPoopQ
+"""Distribution for scripts on Poopy
 
 """
 
@@ -69,7 +69,7 @@ class ScriptSuscriber(multiprocessing.Process):
             fp.write(src)
 
     def run(self):
-        conn = connection.AMPoopQConnection(self.conn)
+        conn = connection.PoopyConnection(self.conn)
         conn.exchange_consume(SCRIPT_E, self._callback)
 
 
@@ -82,7 +82,6 @@ class ScriptPublisher(multiprocessing.Process):
         self.filepath = filepath
         self.ifilename = ifilename
 
-
     def run(self):
         logger.info("Deploying script '{}'".format(self.filepath))
 
@@ -92,7 +91,7 @@ class ScriptPublisher(multiprocessing.Process):
             "filename": os.path.basename(self.filepath),
             "ifilename": self.ifilename, "src": src
         })
-        conn = connection.AMPoopQConnection(self.conn)
+        conn = connection.PoopyConnection(self.conn)
         channel = conn.channel()
         channel.exchange_declare(exchange=SCRIPT_E, type='fanout')
         channel.basic_publish(exchange=SCRIPT_E, routing_key='', body=body)

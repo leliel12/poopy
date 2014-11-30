@@ -11,7 +11,8 @@
 # DOCS
 #==============================================================================
 
-"""Implementation of execution node of AMPoopQ
+"""This module copy and retrieves the files over a poopFS distributed file
+system
 
 """
 
@@ -40,31 +41,31 @@ from . import connection, serializer, conf
 # CONSTANTS
 #==============================================================================
 
-PREFIX_POOPFS = "poopFS://"
+PREFIX_POOPY_FS = "poopyFS://"
 
-POOPFS_E = "poopFS_exchange"
+POOPY_FS_E = "poopyFS_exchange"
 
-logger = conf.getLogger("poopFS")
+logger = conf.getLogger("poopyFS")
 
 #==============================================================================
 # CLASS
 #==============================================================================
 
-class PoopFSSuscriber(multiprocessing.Process):
+class PoopyFSSuscriber(multiprocessing.Process):
 
     def __init__(self, conn, conf, *args, **kwargs):
-        super(PoopFSSuscriber, self).__init__(*args, **kwargs)
+        super(PoopyFSSuscriber, self).__init__(*args, **kwargs)
         self.conn = conn
         self.lconf = conf
-        if not os.path.isdir(conf.POOP_FS):
-            os.makedirs(conf.POOP_FS)
+        if not os.path.isdir(conf.POOPY_FS):
+            os.makedirs(conf.POOPY_FS)
 
     def _callback(self, ch, method, properties, body):
         data = serializer.loads(body)
-        fname = data["poopFSpath"]
+        fname = data["poopyFSpath"]
         src = data["src"]
-        logger.info("Receiving {}{}".format(PREFIX_POOPFS, fname))
-        fpath = os.path.join(self.lconf.POOP_FS, fname)
+        logger.info("Receiving {}{}".format(PREFIX_POOPY_FS, fname))
+        fpath = os.path.join(self.lconf.POOPY_FS, fname)
         dirname = os.path.dirname(fpath)
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
@@ -72,36 +73,36 @@ class PoopFSSuscriber(multiprocessing.Process):
             fp.write(src)
 
     def run(self):
-        conn = connection.AMPoopQConnection(self.conn)
-        conn.exchange_consume(POOPFS_E, self._callback)
+        conn = connection.PoopyConnection(self.conn)
+        conn.exchange_consume(POOPY_FS_E, self._callback)
 
 
-class PoopFSPublisher(multiprocessing.Process):
+class PoopyFSPublisher(multiprocessing.Process):
 
-    def __init__(self, conn, conf, filepath, poopFSpath, *args, **kwargs):
-        super(PoopFSPublisher, self).__init__(*args, **kwargs)
+    def __init__(self, conn, conf, filepath, poopyFSpath, *args, **kwargs):
+        super(PoopyFSPublisher, self).__init__(*args, **kwargs)
         self.conn = conn
         self.lconf = conf
         self.filepath = filepath
-        self.poopFSpath = poopFSpath
+        self.poopyFSpath = poopyFSpath
 
-    def _clean_poopfs_filename(self, poopFSpath):
-        if not poopFSpath.startswith(PREFIX_POOPFS):
+    def _clean_poopyfs_filename(self, poopyFSpath):
+        if not poopyFSpath.startswith(PREFIX_POOPY_FS):
             raise ValueError(
-                "poopFS path must start with '{}'".format(PREFIX_POOPFS)
+                "poopyFS path must start with '{}'".format(PREFIX_POOPY_FS)
             )
-        return poopFSpath.replace(PREFIX_POOPFS, "", 1)
+        return poopyFSpath.replace(PREFIX_POOPY_FS, "", 1)
 
     def run(self):
         logger.info(
-            "Upoloading '{}' to '{}'".format(self.filepath, self.poopFSpath)
+            "Upoloading '{}' to '{}'".format(self.filepath, self.poopyFSpath)
         )
-        to_path = self._clean_poopfs_filename(self.poopFSpath)
+        to_path = self._clean_poopyfs_filename(self.poopyFSpath)
         with open(self.filepath, "rb") as fp:
             src = fp.read()
-        body = serializer.dumps({"poopFSpath": to_path, "src": src})
+        body = serializer.dumps({"poopyFSpath": to_path, "src": src})
 
-        conn = connection.AMPoopQConnection(self.conn)
+        conn = connection.PoopyConnection(self.conn)
         channel = conn.channel()
-        channel.exchange_declare(exchange=POOPFS_E, type='fanout')
-        channel.basic_publish(exchange=POOPFS_E, routing_key='', body=body)
+        channel.exchange_declare(exchange=POOPY_FS_E, type='fanout')
+        channel.basic_publish(exchange=POOPY_FS_E, routing_key='', body=body)

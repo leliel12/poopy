@@ -11,7 +11,7 @@
 # DOCS
 #==============================================================================
 
-"""This module create and mantain the basic AMPoopQ configuration
+"""This module create and mantain the basic Poopy configuration
 
 """
 
@@ -41,13 +41,13 @@ PATH = os.path.abspath(os.path.dirname(__file__))
 
 USER_HOME = os.path.expanduser("~")
 
-AMPOOPQ_DIR = os.path.join(USER_HOME, ".ampoopq")
+POOPY_DIR = os.path.join(USER_HOME, ".poopy")
 
-CONF_PATH = os.path.join(AMPOOPQ_DIR, "conf.json")
+CONF_PATH = os.path.join(POOPY_DIR, "conf.json")
 
-POOP_FS = os.path.join(AMPOOPQ_DIR, "poop_fs")
+POOPY_FS = os.path.join(POOPY_DIR, "poopy_fs")
 
-SCRIPTS = os.path.join(AMPOOPQ_DIR, "scripts")
+SCRIPTS = os.path.join(POOPY_DIR, "scripts")
 
 
 #==============================================================================
@@ -73,12 +73,12 @@ def getLogger(name=PRJ):
 # CONFS
 #==============================================================================
 
-def conf_from_file(conf_path=CONF_PATH, poop_fs=POOP_FS, scripts=SCRIPTS):
+def conf_from_file(conf_path=CONF_PATH, poopy_fs=POOPY_FS, scripts=SCRIPTS):
     data = None
     if not os.path.isdir(os.path.dirname(conf_path)):
         os.makedirs(os.path.dirname(conf_path))
-    if not os.path.isdir(os.path.dirname(poop_fs)):
-        os.makedirs(os.path.dirname(poop_fs))
+    if not os.path.isdir(os.path.dirname(poopy_fs)):
+        os.makedirs(os.path.dirname(poopy_fs))
     if os.path.exists(conf_path):
         with open(conf_path) as fp:
             data = json.load(fp)
@@ -87,7 +87,7 @@ def conf_from_file(conf_path=CONF_PATH, poop_fs=POOP_FS, scripts=SCRIPTS):
         with open(conf_path, "w") as fp:
             json.dump(data, fp, indent=2)
     data["CONF_PATH"] = conf_path
-    data["POOP_FS"] = poop_fs
+    data["POOPY_FS"] = poopy_fs
     data["SCRIPTS"] = scripts
     return conf(**data)
 
@@ -100,7 +100,7 @@ def conf(**kwargs):
         "UUID": unicode(uuid.uuid4()),
         "TTL": 30,
         "SLEEP": 5,
-        "POOP_FS": None,
+        "POOPY_FS": None,
         "SCRIPTS": None
     }
     data.update(kwargs)
