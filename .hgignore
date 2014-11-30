@@ -10,6 +10,7 @@ syntax: regexp
 ^.*(.)orig$
 ^\.settings$
 ^.*[.](db|sqlite|yyf|yjf|json|yaml|yml)$
+^poopy.egg-info/.*$
 
 syntax: glob
 
