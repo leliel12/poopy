@@ -160,10 +160,21 @@ def main():
     def manage_run(args):
         with proccontext() as ctx:
             conn = args.connection
+            clsname = args.clsname
+
             logger.info("Start discover nodes...")
             pong_sub = pong_node.PongSubscriber(conn, lconf)
             ctx.add(pong_sub)
             pong_sub.start()
+
+            logger.info("Reading script {}...".format(args.script))
+            Cls = script.cls_from_path(args.script, clsname)
+            instance = Cls()
+
+            logger.info("Reading {} configuration...".format(args.script))
+            job = script.Job()
+            instance.setup(job)
+            import ipdb; ipdb.set_trace()
 
             logger.info("Deploy script...")
             iname = "i{}_{}".format(
@@ -184,6 +195,7 @@ def main():
     run_cmd = subparsers.add_parser('run', help='run script on Poopy cluster')
     run_cmd.add_argument('connection', help="AMPQ URL")
     run_cmd.add_argument('script', help='script to run')
+    run_cmd.add_argument('clsname', help='class name inside the script')
     run_cmd.add_argument('out', help='output directory')
     run_cmd.set_defaults(func=manage_run)
 

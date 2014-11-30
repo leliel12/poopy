@@ -13,15 +13,11 @@ class Script(script.ScriptBase):
         raise NotImplementedError()
 
     def setup(self, job):
-        job.set_name("Random Forest")
-        #job.setJarByClass(MyJ.class);
-        job.set_mapper("map")
-        #job.setCombinerClass(IntSumReducer.class);
-        job.set_reducer("reduce");
-        #~ job.setOutputKeyClass(Text.class);
-        #~ job.setOutputValueClass(IntWritable.class);
-        job.set_input_path("poopyFS:///", script.ARFFReader)
-        job.output_path("output")
+        job.name = "Random Forest"
+        job.mappers.append("map")
+        job.reducers.append("reduce")
+        job.input_path.append(("poopyFS:///", self.readers.runpy))
+        job.output_path = "output"
 
 
 
