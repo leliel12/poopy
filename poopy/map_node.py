@@ -49,13 +49,17 @@ class MapSubscriber(multiprocessing.Process):
 
     # callback
     def _callback(self, ch, method, properties, body):
+        logger.info("Map Data recived!")
         data = serializer.loads(body)
         iname = data["iname"]
         clsname = data["clsname"]
         inamepath = os.path.join(self.lconf.SCRIPTS, iname)
         instance = script.cls_from_path(inamepath, clsname)()
         job = script.Job(instance, clsname, iname)
-        print job.name
+
+        logger.info("Preparing for run map for job '{}'".format(job.name))
+
+
 
     def run(self):
         conn = connection.PoopyConnection(self.conn)
