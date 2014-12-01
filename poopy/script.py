@@ -102,8 +102,9 @@ class ScriptBase(object):
 
 class Job(object):
 
-    def __init__(self, script, iname, uuid=None):
+    def __init__(self, script, clsname, iname, uuid=None):
         self._script = script
+        self._clsname = clsname
         self._name = "<NO-NAME>"
         self._global_vars = {}
         self._mappers = []
@@ -119,6 +120,10 @@ class Job(object):
     @property
     def script(self):
         return self._script
+
+    @property
+    def clsname(self):
+        return self._clsname
 
     @property
     def iname(self):

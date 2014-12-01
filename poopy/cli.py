@@ -151,12 +151,20 @@ def main():
             ctx.add(script_sub)
             script_sub.start()
 
+            msg = "Preparing mappers..."
+            logger.info(msg)
+            map_sub = map_node.MapSubscriber(conn, lconf)
+            ctx.add(map_sub)
+            map_sub.start()
+
             msg = "Start announce my existence..."
             logger.info(msg)
             pong_pub = pong_node.PongPublisher(conn, lconf)
             ctx.add(pong_pub)
             pong_pub.start()
             pong_pub.join()
+
+
 
     deploy_cmd = subparsers.add_parser('deploy', help='Deploy Poopy node')
     deploy_cmd.add_argument('connection', help="AMPQ URL")
@@ -185,7 +193,7 @@ def main():
             instance = Cls()
 
             logger.info("Reading {} configuration...".format(args.script))
-            job = script.Job(instance, iname)
+            job = script.Job(instance, clsname, iname)
 
             logger.info("Deploying script...")
             script_pub = script_node.ScriptPublisher(

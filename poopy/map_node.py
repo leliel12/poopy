@@ -21,9 +21,10 @@
 #==============================================================================
 
 import time
+import os
 import multiprocessing
 
-from . import connection, conf, serializer
+from . import connection, conf, serializer, script
 
 
 #==============================================================================
@@ -39,52 +40,26 @@ logger = conf.getLogger("Map")
 # CLASS
 #==============================================================================
 
-class PongSubscriber(multiprocessing.Process):
+class MapSubscriber(multiprocessing.Process):
 
     def __init__(self, conn, conf, *args, **kwargs):
-        super(PongSubscriber, self).__init__(*args, **kwargs)
+        super(MapSubscriber, self).__init__(*args, **kwargs)
         self.conn = conn
         self.lconf = conf
-        self._queue = multiprocessing.Queue()
-        self._oldtimes = []
-        self._buff = {}
-
-    def reload_buff(self):
-        while self._queue.qsize():
-            itime, data = self._queue.get_nowait().split("::", 1)
-            rconf = conf.conf(**serializer.loads(data))
-            self._buff[rconf.UUID] = (float(itime), rconf)
-
-    def uuids(self):
-        self.reload_buff()
-        return [k for k in self._buff.keys() if self.is_node_alive(k)]
-
-    def is_node_alive(self, uuid):
-        self.reload_buff()
-        return (
-            uuid in self._buff and
-            time.time() - self._buff[uuid][0] < self.lconf.TTL
-        )
-
-    def get_node_conf(self, uuid):
-        if self.is_node_alive(uuid):
-            return self._buff[uuid][1]
 
     # callback
     def _callback(self, ch, method, properties, body):
-        if self._queue.qsize() == 0:
-            self._oldtimes = []
-        for oldtime in tuple(self._oldtimes):
-            if time.time() - oldtime > self.lconf.TTL:
-                self._queue.get_nowait()
-                self._oldtimes.remove(oldtime)
-        itime = time.time()
-        self._queue.put_nowait("{}::{}".format(itime, body))
-        self._oldtimes.append(itime)
+        data = serializer.loads(body)
+        iname = data["iname"]
+        clsname = data["clsname"]
+        inamepath = os.path.join(self.lconf.SCRIPTS, iname)
+        instance = script.cls_from_path(inamepath, clsname)()
+        job = script.Job(instance, clsname, iname)
+        print job.name
 
     def run(self):
         conn = connection.PoopyConnection(self.conn)
-        conn.exchange_consume(PONG_E, self._callback)
+        conn.exchange_consume(MAP_E, self._callback, self.lconf.UUID)
 
 
 class MapPublisher(multiprocessing.Process):
@@ -105,8 +80,8 @@ class MapPublisher(multiprocessing.Process):
                 "Map Execution signal for script '{}' sended to node '{}'"
             ).format(self.job.name, uuid)
             logger.info(msg)
-
-
-            body = serializer.dumps({"iname": self.job.iname})
+            body = serializer.dumps({
+                "iname": self.job.iname, "clsname": self.job.clsname}
+            )
             channel.basic_publish(exchange=MAP_E, routing_key=uuid, body=body)
 

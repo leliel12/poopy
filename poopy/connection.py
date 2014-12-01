@@ -34,11 +34,13 @@ class PoopyConnection(pika.BlockingConnection):
         self.params = pika.URLParameters(conn_str)
         super(PoopyConnection, self).__init__(self.params, *args, **kwargs)
 
-    def exchange_consume(self, exchange, callback):
+    def exchange_consume(self, exchange, callback, routing_key=None):
         channel = self.channel()
         channel.exchange_declare(exchange=exchange, type='fanout')
         result = channel.queue_declare(exclusive=True)
         queue_name = result.method.queue
-        channel.queue_bind(exchange=exchange, queue=queue_name)
+        channel.queue_bind(
+            exchange=exchange, queue=queue_name, routing_key=routing_key
+        )
         channel.basic_consume(callback, queue=queue_name, no_ack=False)
         channel.start_consuming()
