@@ -34,18 +34,17 @@ except ImportError:
 
 import pika
 
-from . import connection, serializer, conf
+from . import connection, serializer, conf, poopyfs
 
 
 #==============================================================================
 # CONSTANTS
 #==============================================================================
 
-PREFIX_POOPY_FS = "poopyFS://"
-
 POOPY_FS_E = "poopyFS_exchange"
 
 logger = conf.getLogger("poopyFS")
+
 
 #==============================================================================
 # CLASS
@@ -64,8 +63,8 @@ class PoopyFSSuscriber(multiprocessing.Process):
         data = serializer.loads(body)
         fname = data["poopyFSpath"]
         src = data["src"]
-        logger.info("Receiving {}{}".format(PREFIX_POOPY_FS, fname))
-        fpath = os.path.join(self.lconf.POOPY_FS, fname)
+        logger.info("Receiving {}{}".format(poopyfs.PREFIX_POOPY_FS, fname))
+        fpath = poopyfs.resolve_poopyfslocal(fname, self.lconf, clean=False)
         dirname = os.path.dirname(fpath)
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
@@ -86,18 +85,11 @@ class PoopyFSPublisher(multiprocessing.Process):
         self.filepath = filepath
         self.poopyFSpath = poopyFSpath
 
-    def _clean_poopyfs_filename(self, poopyFSpath):
-        if not poopyFSpath.startswith(PREFIX_POOPY_FS):
-            raise ValueError(
-                "poopyFS path must start with '{}'".format(PREFIX_POOPY_FS)
-            )
-        return poopyFSpath.replace(PREFIX_POOPY_FS, "", 1)
-
     def run(self):
         logger.info(
             "Upoloading '{}' to '{}'".format(self.filepath, self.poopyFSpath)
         )
-        to_path = self._clean_poopyfs_filename(self.poopyFSpath)
+        to_path = poopyfs.clean_poopyfs_filename(self.poopyFSpath)
         with open(self.filepath, "rb") as fp:
             src = fp.read()
         body = serializer.dumps({"poopyFSpath": to_path, "src": src})

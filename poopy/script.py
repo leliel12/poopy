@@ -26,6 +26,8 @@ import inspect
 import collections
 import copy
 
+from . import readers
+
 
 #==============================================================================
 # CONSTANTS
@@ -62,9 +64,8 @@ class ScriptMeta(abc.ABCMeta):
         super(ScriptMeta, self).__init__(*args, **kwargs)
 
         # modify readers list
-        readers_dict = {r.__name__: r for r in self.readers}
+        readers_dict = {r.__name__: r for r in readers.BaseReader.subclasses()}
         ReadersClass = collections.namedtuple("Readers", readers_dict.keys())
-        self._readers = self.readers
         self.readers = ReadersClass(**readers_dict)
 
     def __repr__(cls):
@@ -77,7 +78,6 @@ class ScriptMeta(abc.ABCMeta):
 class ScriptBase(object):
 
     class_name = None
-    readers = [runpy]
     __metaclass__ = ScriptMeta
 
     @abc.abstractmethod
@@ -164,6 +164,21 @@ class Job(object):
     @property
     def local_vars(self):
         return self._local_vars
+
+
+#==============================================================================
+# MAP CONTEXT
+#==============================================================================
+
+class MapContext(object):
+
+    def __init__(self, emiter, job):
+        self.job = job
+        self._emiter = emiter
+
+    def emit(self, k, v):
+        self._emiter(k, v)
+
 
 
 #==============================================================================

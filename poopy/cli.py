@@ -177,6 +177,7 @@ def main():
     def manage_run(args):
         with proccontext() as ctx:
             conn = args.connection
+            scriptpath = args.script
             clsname = args.clsname
 
             logger.info("Start discover nodes...")
@@ -185,27 +186,19 @@ def main():
             pong_sub.start()
 
             iname = "i{}_{}".format(
-                uuid.uuid4().hex, os.path.basename(args.script)
+                uuid.uuid4().hex, os.path.basename(scriptpath)
             )
             logger.info("Iname generated: {}".format(iname))
-            logger.info("Reading script {}...".format(args.script))
-            Cls = script.cls_from_path(args.script, clsname)
-            instance = Cls()
-
-            logger.info("Reading {} configuration...".format(args.script))
-            job = script.Job(instance, clsname, iname)
 
             logger.info("Deploying script...")
             script_pub = script_node.ScriptPublisher(
-                conn, lconf, args.script, job.iname
+                conn, lconf, scriptpath, iname
             )
             ctx.add(script_pub)
             script_pub.start()
             script_pub.join()
 
-            logger.info("{} will start in {} seconds...".format(
-                job.name, lconf.SLEEP
-            ))
+            logger.info("Run will start in {} seconds...".format(lconf.SLEEP))
             time.sleep(lconf.SLEEP)
             uuids = pong_sub.uuids()
             if not uuids:
@@ -214,7 +207,10 @@ def main():
 
             logger.info("Found {} nodes".format(len(uuids)))
             logger.info("Staring Maps...")
-            map_pub = map_node.MapPublisher(conn, conf, job, uuids)
+
+            map_pub = map_node.MapPublisher(
+                conn, conf, scriptpath, iname, clsname, uuids
+            )
             ctx.add(map_pub)
             map_pub.start()
             map_pub.join()
