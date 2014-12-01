@@ -31,11 +31,11 @@ from . import connection, conf, serializer, script, readers, poopyfs
 # CONSTANTS
 #==============================================================================
 
-MAP_E = "map_exchange"
+REDUCE_E = "reduce_exchange"
 
-MAP_RESPONSE_E = "map_response_exchange"
+REDUCE_RESPONSE_E = "reduce_response_exchange"
 
-logger = conf.getLogger("Map")
+logger = conf.getLogger("Reduce")
 
 
 #==============================================================================
