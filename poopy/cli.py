@@ -173,7 +173,6 @@ def main():
             pong_pub.join()
 
 
-
     deploy_cmd = subparsers.add_parser('deploy', help='Deploy Poopy node')
     deploy_cmd.add_argument('connection', help="AMPQ URL")
     deploy_cmd.set_defaults(func=manage_deploy)
@@ -264,9 +263,10 @@ def main():
                 data = serializer.dumps(results)
                 fp.write(data)
 
-            logger.info(
-                "Your data is pickled in base64 here {}".format(outpath)
-            )
+            logger.info((
+                "Your data is pickled in base64 here {}\n"
+                "If you want to extract the model use 'serializer.load|s'"
+            ).format(outpath))
 
     run_cmd = subparsers.add_parser('run', help='run script on Poopy cluster')
     run_cmd.add_argument('connection', help="AMPQ URL")
