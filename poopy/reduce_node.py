@@ -53,7 +53,7 @@ class ReduceResultSubscriber(multiprocessing.Process):
         self._ready = set()
         self._buff = {}
 
-    def responses(self):
+    def results(self):
         return self._buff if self._ready == self.uuids else {}
 
     def ended(self):
@@ -71,7 +71,7 @@ class ReduceResultSubscriber(multiprocessing.Process):
 
     def run(self):
         conn = connection.PoopyConnection(self.conn)
-        conn.exchange_consume(MAP_RESPONSE_E, self._callback)
+        conn.exchange_consume(REDUCE_RESPONSE_E, self._callback)
 
 
 #==============================================================================

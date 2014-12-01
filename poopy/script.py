@@ -46,7 +46,8 @@ class Script(script.ScriptBase):
         raise NotImplementedError()
 
     def reduce(self, k, v, ctx):
-        ctx.emit(k, v)
+        for vi in v:
+            ctx.emit(k, vi)
 
     def setup(self, ctx):
         raise NotImplementedError()
@@ -85,7 +86,8 @@ class ScriptBase(object):
         raise NotImplementedError()
 
     def reduce(self, k, v, ctx):
-        ctx.emit(k, v)
+        for vi in v:
+            ctx.emit(k, vi)
 
     @abc.abstractmethod
     def setup(self, ctx):

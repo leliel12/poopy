@@ -33,11 +33,12 @@ import random
 import pickle
 import multiprocessing
 import contextlib
+import datetime
 
 from . import PRJ, STR_VERSION, DOC, WARRANTY
 from . import (
     conf, connection, script, pong_node, poopyfs_node,
-    script_node, map_node, reduce_node
+    script_node, map_node, reduce_node, serializer
 )
 
 
@@ -186,6 +187,13 @@ def main():
             conn = args.connection
             scriptpath = args.script
             clsname = args.clsname
+            out = args.out
+
+            if not os.path.isdir(out):
+                os.makedirs(out)
+            outpath = os.path.join(
+                out, datetime.datetime.now().isoformat().replace(":", "-")
+            )
 
             logger.info("Start discover nodes...")
             pong_sub = pong_node.PongSubscriber(conn, lconf)
@@ -218,6 +226,11 @@ def main():
             ctx.add(mapr_sub)
             mapr_sub.start()
 
+            logger.info("Starting Reduce Responsers...")
+            reducer_sub = reduce_node.ReduceResultSubscriber(conn, conf, uuids)
+            ctx.add(reducer_sub)
+            reducer_sub.start()
+
             logger.info("Starting Mapperss...")
             map_pub = map_node.MapPublisher(
                 conn, conf, scriptpath, iname, clsname, uuids
@@ -239,6 +252,21 @@ def main():
             ctx.add(reduce_pub)
             reduce_pub.start()
             reduce_pub.join()
+
+            while not reducer_sub.ended():
+                time.sleep(lconf.SLEEP)
+
+            logger.info("Reducers finished")
+            results = reducer_sub.results()
+
+            logger.info("Writing output")
+            with open(outpath, "w") as fp:
+                data = serializer.dumps(results)
+                fp.write(data)
+
+            logger.info(
+                "Your data is pickled in base64 here {}".format(outpath)
+            )
 
     run_cmd = subparsers.add_parser('run', help='run script on Poopy cluster')
     run_cmd.add_argument('connection', help="AMPQ URL")

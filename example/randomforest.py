@@ -29,6 +29,10 @@ class Script(script.ScriptBase):
                                   min_samples_leaf=10)
         ctx.emit(None, dt)
 
+    def reduce(self, k, v, ctx):
+        for vi in v:
+            ctx.emit("iris", vi)
+
     def setup(self, job):
         job.name = "Random Forest"
         job.mappers.append("map")
