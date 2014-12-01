@@ -7,6 +7,7 @@ Install
 
 **From PYPI**
 
+#. Install rabitMQ
 #. ``pip install poopy`` (please use virtualenv)
 #. Download this file
    https://bitbucket.org/leliel12/poopy/raw/tip/example/iris.arff?at=default
@@ -17,7 +18,7 @@ Install
 **From REPO**
 
 #. Install rabitMQ
-#. Clone this repo
+#. Clone this https://bitbucket.org/leliel12/poopy repo
 #. ``pip install -e .``
 #. The archives *iris.arff* and *randomforest.py* are inside in ``examples/``
 
