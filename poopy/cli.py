@@ -206,7 +206,12 @@ def main():
                 raise PoopyError(msg)
 
             logger.info("Found {} nodes".format(len(uuids)))
-            logger.info("Staring Maps...")
+            logger.info("Starting Map Response...")
+            mapr_sub = map_node.MapResultSubscriber(conn, conf, uuids)
+            ctx.add(mapr_sub)
+            mapr_sub.start()
+
+            logger.info("Starting Maps...")
 
             map_pub = map_node.MapPublisher(
                 conn, conf, scriptpath, iname, clsname, uuids
@@ -214,6 +219,12 @@ def main():
             ctx.add(map_pub)
             map_pub.start()
             map_pub.join()
+
+            while not mapr_sub.ended():
+                time.sleep(lconf.SLEEP)
+
+            print mapr_sub.responses()
+
 
 
     run_cmd = subparsers.add_parser('run', help='run script on Poopy cluster')

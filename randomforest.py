@@ -29,7 +29,6 @@ class Script(script.ScriptBase):
                                   min_samples_leaf=10)
         ctx.emit(None, dt)
 
-
     def reduce(self, k, v, ctx):
         raise NotImplementedError()
 

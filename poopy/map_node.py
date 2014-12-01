@@ -39,6 +39,42 @@ logger = conf.getLogger("Map")
 
 
 #==============================================================================
+# RESULT SUBSCRIBER
+#==============================================================================
+
+class MapResultSubscriber(multiprocessing.Process):
+
+    def __init__(self, conn, conf, uuids, *args, **kwargs):
+        super(MapResultSubscriber, self).__init__(*args, **kwargs)
+        self.conn = conn
+        self.lconf = conf
+        self.uuids = set(uuids)
+        self._queue = multiprocessing.Queue()
+        self._ready = set()
+        self._buff = {}
+
+    def responses(self):
+        return self._buff if self._ready == self.uuids else {}
+
+    def ended(self):
+        while self._queue.qsize():
+            body = self._queue.get_nowait()
+            data = serializer.loads(body)
+            self._ready.add(data["uuid"])
+            k, v = data["k"], data["v"]
+            self._buff[k] = v
+        return self._ready == self.uuids
+
+    # callback
+    def _callback(self, ch, method, properties, body):
+        self._queue.put(body)
+
+    def run(self):
+        conn = connection.PoopyConnection(self.conn)
+        conn.exchange_consume(MAP_RESPONSE_E, self._callback)
+
+
+#==============================================================================
 # SUBSCRIBER
 #==============================================================================
 
