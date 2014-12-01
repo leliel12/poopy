@@ -99,7 +99,7 @@ def conf(**kwargs):
         "CONF_PATH": None,
         "UUID": unicode(uuid.uuid4()),
         "TTL": 30,
-        "SLEEP": 2,
+        "SLEEP": 5,
         "POOPY_FS": None,
         "SCRIPTS": None
     }

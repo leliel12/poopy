@@ -212,8 +212,9 @@ def main():
             script_pub.start()
             script_pub.join()
 
-            logger.info("Run will start in {} seconds...".format(lconf.SLEEP))
-            time.sleep(lconf.SLEEP)
+            wait = lconf.SLEEP + lconf.SLEEP / 2.0 + 0.5
+            logger.info("Run will start in {} seconds...".format(wait))
+            time.sleep(wait)
             uuids = pong_sub.uuids()
             if not uuids:
                 msg = "No nodes found. Aborting..."
