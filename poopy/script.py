@@ -46,7 +46,7 @@ class Script(script.ScriptBase):
         raise NotImplementedError()
 
     def reduce(self, k, v, ctx):
-        raise NotImplementedError()
+        ctx.emit(k, v)
 
     def setup(self, ctx):
         raise NotImplementedError()
@@ -84,16 +84,12 @@ class ScriptBase(object):
     def map(self, k, v, ctx):
         raise NotImplementedError()
 
-    @abc.abstractmethod
     def reduce(self, k, v, ctx):
-        raise NotImplementedError()
+        ctx.emit(k, v)
 
     @abc.abstractmethod
     def setup(self, ctx):
         raise NotImplementedError()
-
-    def conf_for_node(self, uuid):
-        return {}
 
 
 #==============================================================================
@@ -114,7 +110,6 @@ class Job(object):
         self._iname = iname
 
         # populate this conf with the script
-        self._local_vars = self.script.conf_for_node(uuid) if uuid else {}
         self.script.setup(self)
 
     @property
@@ -167,10 +162,10 @@ class Job(object):
 
 
 #==============================================================================
-# MAP CONTEXT
+# CONTEXTS
 #==============================================================================
 
-class MapContext(object):
+class Context(object):
 
     def __init__(self, emiter, job):
         self.job = job
@@ -178,7 +173,6 @@ class MapContext(object):
 
     def emit(self, k, v):
         self._emiter(k, v)
-
 
 
 #==============================================================================

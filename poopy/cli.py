@@ -36,7 +36,8 @@ import contextlib
 
 from . import PRJ, STR_VERSION, DOC, WARRANTY
 from . import (
-    conf, connection, script, pong_node, poopyfs_node, script_node, map_node
+    conf, connection, script, pong_node, poopyfs_node,
+    script_node, map_node, reduce_node
 )
 
 
@@ -157,6 +158,12 @@ def main():
             ctx.add(map_sub)
             map_sub.start()
 
+            msg = "Preparing reducers..."
+            logger.info(msg)
+            reduce_sub = reduce_node.ReduceSubscriber(conn, lconf)
+            ctx.add(reduce_sub)
+            reduce_sub.start()
+
             msg = "Start announce my existence..."
             logger.info(msg)
             pong_pub = pong_node.PongPublisher(conn, lconf)
@@ -197,6 +204,7 @@ def main():
             ctx.add(script_pub)
             script_pub.start()
             script_pub.join()
+            script_pub.terminate()
 
             logger.info("Run will start in {} seconds...".format(lconf.SLEEP))
             time.sleep(lconf.SLEEP)
@@ -206,13 +214,12 @@ def main():
                 raise PoopyError(msg)
 
             logger.info("Found {} nodes".format(len(uuids)))
-            logger.info("Starting Map Response...")
+            logger.info("Starting Map Responsers...")
             mapr_sub = map_node.MapResultSubscriber(conn, conf, uuids)
             ctx.add(mapr_sub)
             mapr_sub.start()
 
-            logger.info("Starting Maps...")
-
+            logger.info("Starting Mapperss...")
             map_pub = map_node.MapPublisher(
                 conn, conf, scriptpath, iname, clsname, uuids
             )
@@ -222,11 +229,19 @@ def main():
 
             while not mapr_sub.ended():
                 time.sleep(lconf.SLEEP)
+            map_pub.terminate()
+            mapr_sub.terminate()
 
-            print mapr_sub.responses()
+            logger.info("Mappers finished")
+            results = mapr_sub.results()
 
-
-
+            logger.info("Starting Reducers...")
+            reduce_pub = reduce_node.ReducePublisher(
+                conn, conf, scriptpath, iname, clsname, uuids, results
+            )
+            ctx.add(reduce_pub)
+            reduce_pub.start()
+            reduce_pub.join()
 
     run_cmd = subparsers.add_parser('run', help='run script on Poopy cluster')
     run_cmd.add_argument('connection', help="AMPQ URL")

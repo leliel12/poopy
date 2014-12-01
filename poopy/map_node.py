@@ -53,7 +53,7 @@ class MapResultSubscriber(multiprocessing.Process):
         self._ready = set()
         self._buff = {}
 
-    def responses(self):
+    def results(self):
         return self._buff if self._ready == self.uuids else {}
 
     def ended(self):
@@ -108,7 +108,7 @@ class MapSubscriber(multiprocessing.Process):
                 exchange=MAP_RESPONSE_E, routing_key='', body=body
             )
 
-        context = script.MapContext(emiter, job)
+        context = script.Context(emiter, job)
         try:
             for fpath, reader_name, kwargs in files:
                 logger.info("Running map for '{}'".format(fpath))

@@ -107,4 +107,4 @@ class PongPublisher(multiprocessing.Process):
         channel.exchange_declare(exchange=PONG_E, type='fanout')
         while True:
             channel.basic_publish(exchange=PONG_E, routing_key='', body=body)
-            time.sleep(self.lconf.SLEEP)
+            conn.sleep(self.lconf.SLEEP)

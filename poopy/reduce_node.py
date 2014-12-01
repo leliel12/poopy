@@ -78,10 +78,10 @@ class MapResultSubscriber(multiprocessing.Process):
 # SUBSCRIBER
 #==============================================================================
 
-class MapSubscriber(multiprocessing.Process):
+class ReduceSubscriber(multiprocessing.Process):
 
     def __init__(self, conn, conf, *args, **kwargs):
-        super(MapSubscriber, self).__init__(*args, **kwargs)
+        super(ReduceSubscriber, self).__init__(*args, **kwargs)
         self.conn = conn
         self.lconf = conf
         self._pconn = None
@@ -92,77 +92,60 @@ class MapSubscriber(multiprocessing.Process):
         data = serializer.loads(body)
         iname = data["iname"]
         clsname = data["clsname"]
-        files = data["files"]
+        results = data["results"]
+
         inamepath = os.path.join(self.lconf.SCRIPTS, iname)
         instance = script.cls_from_path(inamepath, clsname)()
         job = script.Job(instance, clsname, iname, self.lconf.UUID)
 
-        logger.info("Preparing for run map for job '{}'".format(job.name))
+        logger.info("Preparing for run reduce for job '{}'".format(job.name))
         conn = connection.PoopyConnection(self.conn)
         channel = conn.channel()
-        channel.exchange_declare(exchange=MAP_RESPONSE_E, type='fanout')
+        channel.exchange_declare(exchange=REDUCE_RESPONSE_E, type='fanout')
 
         def emiter(k, v):
             body = serializer.dumps({"k": k, "v": v, "uuid": self.lconf.UUID})
             channel.basic_publish(
-                exchange=MAP_RESPONSE_E, routing_key='', body=body
+                exchange=REDUCE_RESPONSE_E, routing_key='', body=body
             )
 
-        context = script.MapContext(emiter, job)
+        context = script.Context(emiter, job)
         try:
-            for fpath, reader_name, kwargs in files:
-                logger.info("Running map for '{}'".format(fpath))
-                reader = readers.BaseReader.reader_by_name(reader_name)
-                lpath = poopyfs.resolve_poopyfslocal(
-                    fpath, self.lconf, clean=True
-                )
-                data = reader.load(lpath, **kwargs)
-                instance.map(fpath, data, context)
+            for k, v in results.items():
+                logger.info("Running reduce for key '{}'".format(k))
+                instance.reduce(k, v, context)
         except Exception as err:
             logger.error(str(err))
 
     def run(self):
         conn = connection.PoopyConnection(self.conn)
-        conn.exchange_consume(MAP_E, self._callback, self.lconf.UUID)
+        conn.exchange_consume(REDUCE_E, self._callback, self.lconf.UUID)
 
 
 #==============================================================================
 # PUBLISHER
 #==============================================================================
 
-class MapPublisher(multiprocessing.Process):
+class ReducePublisher(multiprocessing.Process):
 
     def __init__(self, conn, conf, script,
-                 iname, clsname, uuids, *args, **kwargs):
-        super(MapPublisher, self).__init__(*args, **kwargs)
+                 iname, clsname, uuids, results, *args, **kwargs):
+        super(ReducePublisher, self).__init__(*args, **kwargs)
         self.conn = conn
         self.lconf = conf
         self.script = script
         self.iname = iname
         self.clsname = clsname
         self.uuids = uuids
+        self.results = results
 
-    def split_files(self, job):
-        files = job.input_path
+    def split_responses(self, job):
+        results = self.results.items()
         chunk_size = len(self.uuids)
-        for idx, chunk_from in enumerate(range(0, len(files), chunk_size)):
+        for idx, chunk_from in enumerate(range(0, len(results), chunk_size)):
             chunk_to = chunk_from + chunk_size
-            chunk = []
-            for filename in files[chunk_from:chunk_to]:
-                if isinstance(filename, (tuple, list)) and len(filename)  == 3:
-                    filename, parser, kwargs = filename
-                    chunk.append((filename, parser.__name__, kwargs))
-                elif isinstance(filename, (tuple, list)):
-                    filename, parser, = filename
-                    chunk.append((filename, parser.__name__, {}))
-                elif isinstance(filename, basestring):
-                    chunk.append((filename, readers.TxtReader.__name__, {}))
-                else:
-                    raise ValueError(
-                        "Filename must be an string or an tuple or "
-                        "list with 2 or 3 elemenets"
-                    )
-            yield self.uuids[idx], chunk
+            chunk = results[chunk_from:chunk_to]
+            yield self.uuids[idx], dict(chunk)
 
     def run(self):
         logger.info("Reading script {}...".format(self.script))
@@ -175,15 +158,18 @@ class MapPublisher(multiprocessing.Process):
         # publishing
         conn = connection.PoopyConnection(self.conn)
         channel = conn.channel()
-        channel.exchange_declare(exchange=MAP_E, type='fanout')
+        channel.exchange_declare(exchange=REDUCE_E, type='fanout')
 
-        for uuid, files in self.split_files(job):
+        for uuid, results in self.split_responses(job):
             msg = (
-                "Sending Map Execution signal for script '{}' to node '{}'"
+                "Sending Reduce Execution signal for job '{}' to node '{}'"
             ).format(job.name, uuid)
             logger.info(msg)
             body = serializer.dumps({
-                "iname": self.iname, "clsname": self.clsname, "files": files
+                "iname": self.iname, "clsname": self.clsname,
+                "results": results
             })
-            channel.basic_publish(exchange=MAP_E, routing_key=uuid, body=body)
+            channel.basic_publish(
+                exchange=REDUCE_E, routing_key=uuid, body=body
+            )
 
