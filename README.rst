@@ -56,9 +56,3 @@ TODO:
 - Not use the central node as main memory.
 - Reorder some modules into packages
 
-
-
-In your directory if all work ok you will find a file with the text
-"hello world" inside.
-
-PS: probably nothing works
