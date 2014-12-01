@@ -24,6 +24,7 @@ import abc
 import runpy
 import inspect
 import collections
+import copy
 
 
 #==============================================================================
@@ -101,13 +102,27 @@ class ScriptBase(object):
 
 class Job(object):
 
-    def __init__(self):
+    def __init__(self, script, iname, uuid=None):
+        self._script = script
         self._name = "<NO-NAME>"
         self._global_vars = {}
         self._mappers = []
         self._reducers = []
         self._input_path = []
-        self._output_path = None
+        self._output_path = "<NO-PATH>"
+        self._iname = iname
+
+        # populate this conf with the script
+        self._local_vars = self.script.conf_for_node(uuid) if uuid else {}
+        self.script.setup(self)
+
+    @property
+    def script(self):
+        return self._script
+
+    @property
+    def iname(self):
+        return self._iname
 
     @property
     def name(self):
@@ -140,6 +155,10 @@ class Job(object):
     @property
     def global_vars(self):
         return self._global_vars
+
+    @property
+    def local_vars(self):
+        return self._local_vars
 
 
 #==============================================================================

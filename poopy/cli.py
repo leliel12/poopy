@@ -35,7 +35,9 @@ import multiprocessing
 import contextlib
 
 from . import PRJ, STR_VERSION, DOC, WARRANTY
-from . import conf, connection, pong_node, poopyfs_node, script_node, script
+from . import (
+    conf, connection, script, pong_node, poopyfs_node, script_node, map_node
+)
 
 
 #==============================================================================
@@ -43,6 +45,13 @@ from . import conf, connection, pong_node, poopyfs_node, script_node, script
 #==============================================================================
 
 logger = conf.getLogger()
+
+
+#==============================================================================
+# ERROR
+#==============================================================================
+
+class PoopyError(Exception): pass
 
 
 #==============================================================================
@@ -167,30 +176,41 @@ def main():
             ctx.add(pong_sub)
             pong_sub.start()
 
+            iname = "i{}_{}".format(
+                uuid.uuid4().hex, os.path.basename(args.script)
+            )
+            logger.info("Iname generated: {}".format(iname))
             logger.info("Reading script {}...".format(args.script))
             Cls = script.cls_from_path(args.script, clsname)
             instance = Cls()
 
             logger.info("Reading {} configuration...".format(args.script))
-            job = script.Job()
-            instance.setup(job)
-            import ipdb; ipdb.set_trace()
+            job = script.Job(instance, iname)
 
-            logger.info("Deploy script...")
-            iname = "i{}_{}".format(
-                uuid.uuid4().hex, os.path.basename(args.script)
-            )
+            logger.info("Deploying script...")
             script_pub = script_node.ScriptPublisher(
-                conn, lconf, args.script, iname
+                conn, lconf, args.script, job.iname
             )
             ctx.add(script_pub)
             script_pub.start()
             script_pub.join()
 
-            logger.info(
-                "Running will start in {} seconds...".format(lconf.SLEEP)
-            )
+            logger.info("{} will start in {} seconds...".format(
+                job.name, lconf.SLEEP
+            ))
             time.sleep(lconf.SLEEP)
+            uuids = pong_sub.uuids()
+            if not uuids:
+                msg = "No nodes found. Aborting..."
+                raise PoopyError(msg)
+
+            logger.info("Found {} nodes".format(len(uuids)))
+            logger.info("Staring Maps...")
+            map_pub = map_node.MapPublisher(conn, conf, job, uuids)
+            ctx.add(map_pub)
+            map_pub.start()
+            map_pub.join()
+
 
     run_cmd = subparsers.add_parser('run', help='run script on Poopy cluster')
     run_cmd.add_argument('connection', help="AMPQ URL")
