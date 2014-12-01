@@ -42,10 +42,10 @@ logger = conf.getLogger("Reduce")
 # RESULT SUBSCRIBER
 #==============================================================================
 
-class MapResultSubscriber(multiprocessing.Process):
+class ReduceResultSubscriber(multiprocessing.Process):
 
     def __init__(self, conn, conf, uuids, *args, **kwargs):
-        super(MapResultSubscriber, self).__init__(*args, **kwargs)
+        super(ReduceResultSubscriber, self).__init__(*args, **kwargs)
         self.conn = conn
         self.lconf = conf
         self.uuids = set(uuids)

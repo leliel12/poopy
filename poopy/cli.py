@@ -204,7 +204,6 @@ def main():
             ctx.add(script_pub)
             script_pub.start()
             script_pub.join()
-            script_pub.terminate()
 
             logger.info("Run will start in {} seconds...".format(lconf.SLEEP))
             time.sleep(lconf.SLEEP)
@@ -229,8 +228,6 @@ def main():
 
             while not mapr_sub.ended():
                 time.sleep(lconf.SLEEP)
-            map_pub.terminate()
-            mapr_sub.terminate()
 
             logger.info("Mappers finished")
             results = mapr_sub.results()
