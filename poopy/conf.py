@@ -73,22 +73,22 @@ def getLogger(name=PRJ):
 # CONFS
 #==============================================================================
 
-def conf_from_file(conf_path=CONF_PATH, poopy_fs=POOPY_FS, scripts=SCRIPTS):
+def conf_from_file(conf_path=CONF_PATH):
     data = None
     if not os.path.isdir(os.path.dirname(conf_path)):
         os.makedirs(os.path.dirname(conf_path))
-    if not os.path.isdir(os.path.dirname(poopy_fs)):
-        os.makedirs(os.path.dirname(poopy_fs))
     if os.path.exists(conf_path):
         with open(conf_path) as fp:
             data = json.load(fp)
     else:
-        data = {"UUID": unicode(uuid.uuid4())}
+        data = {
+            "UUID": unicode(uuid.uuid4()),
+            "POOPY_FS": POOPY_FS,
+            "SCRIPTS":  SCRIPTS
+        }
         with open(conf_path, "w") as fp:
             json.dump(data, fp, indent=2)
     data["CONF_PATH"] = conf_path
-    data["POOPY_FS"] = poopy_fs
-    data["SCRIPTS"] = scripts
     return conf(**data)
 
 
