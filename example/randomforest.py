@@ -35,10 +35,7 @@ class Script(script.ScriptBase):
 
     def setup(self, job):
         job.name = "Random Forest"
-        job.mappers.append("map")
-        job.reducers.append("reduce")
         job.input_path.append(["poopyFS://iris.arff", self.readers.ARFFReader])
-        job.output_path = "output"
 
 
 

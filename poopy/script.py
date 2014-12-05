@@ -49,8 +49,9 @@ class Script(script.ScriptBase):
         for vi in v:
             ctx.emit(k, vi)
 
-    def setup(self, ctx):
-        raise NotImplementedError()
+    def setup(self, job):
+        job.name = "NO-NAME"
+
 
 """.strip()
 

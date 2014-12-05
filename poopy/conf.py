@@ -84,7 +84,9 @@ def conf_from_file(conf_path=CONF_PATH):
         data = {
             "UUID": unicode(uuid.uuid4()),
             "POOPY_FS": POOPY_FS,
-            "SCRIPTS":  SCRIPTS
+            "SCRIPTS":  SCRIPTS,
+            "TTL": 30,
+            "SLEEP": 5,
         }
         with open(conf_path, "w") as fp:
             json.dump(data, fp, indent=2)
@@ -93,19 +95,8 @@ def conf_from_file(conf_path=CONF_PATH):
 
 
 def conf(**kwargs):
-    data = {
-        "PATH": PATH,
-        "USER_HOME": USER_HOME,
-        "CONF_PATH": None,
-        "UUID": unicode(uuid.uuid4()),
-        "TTL": 30,
-        "SLEEP": 5,
-        "POOPY_FS": None,
-        "SCRIPTS": None
-    }
-    data.update(kwargs)
-    cls = collections.namedtuple("Conf", data.keys())
-    return cls(**data)
+    cls = collections.namedtuple("Conf", kwargs.keys())
+    return cls(**kwargs)
 
 
 #==============================================================================
