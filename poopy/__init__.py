@@ -24,7 +24,7 @@ u"""Pure Python implementation of Map-Reduce over AMQP
 PRJ = "Poopy"
 
 # : The project version as tuple of strings
-VERSION = ("0", "3")
+VERSION = ("0", "2", "5")
 
 # : The project version as string
 STR_VERSION = ".".join(VERSION)
