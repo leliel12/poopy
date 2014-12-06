@@ -11,7 +11,7 @@
 # DOCS
 #==============================================================================
 
-u"""Pure Python implementation of Map-Reduce over AMPQ
+u"""Pure Python implementation of Map-Reduce over AMQP
 
 """
 
@@ -24,7 +24,7 @@ u"""Pure Python implementation of Map-Reduce over AMPQ
 PRJ = "Poopy"
 
 # : The project version as tuple of strings
-VERSION = ("0", "2")
+VERSION = ("0", "3")
 
 # : The project version as string
 STR_VERSION = ".".join(VERSION)
@@ -74,7 +74,7 @@ This program comes with ABSOLUTELY NO WARRANTY; for details see {}
 
 
 # : Keywords for search of pypi
-KEYWORDS = """ampq rabitmq map reduce"""
+KEYWORDS = """amqp rabitmq map reduce"""
 
 # : If the program is en debug mode
 DEBUG = __debug__

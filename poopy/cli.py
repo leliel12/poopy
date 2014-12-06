@@ -128,7 +128,7 @@ def main():
 
 
     upload_cmd = subparsers.add_parser('upload', help='upload file to poopyFS')
-    upload_cmd.add_argument('connection', help="AMPQ URL")
+    upload_cmd.add_argument('connection', help="AMQP URL")
     upload_cmd.add_argument('filepath', help='file to upload')
     upload_cmd.add_argument('poopyFSpath', help='file path to upload')
     upload_cmd.set_defaults(func=manage_upload)
@@ -174,7 +174,7 @@ def main():
 
 
     deploy_cmd = subparsers.add_parser('deploy', help='Deploy Poopy node')
-    deploy_cmd.add_argument('connection', help="AMPQ URL")
+    deploy_cmd.add_argument('connection', help="AMQP URL")
     deploy_cmd.set_defaults(func=manage_deploy)
 
     #==========================================================================
@@ -270,7 +270,7 @@ def main():
             ).format(outpath))
 
     run_cmd = subparsers.add_parser('run', help='run script on Poopy cluster')
-    run_cmd.add_argument('connection', help="AMPQ URL")
+    run_cmd.add_argument('connection', help="AMQP URL")
     run_cmd.add_argument('script', help='script to run')
     run_cmd.add_argument('clsname', help='class name inside the script')
     run_cmd.add_argument('out', help='output directory')

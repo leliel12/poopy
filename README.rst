@@ -1,5 +1,5 @@
 
-Poopy - An unusable map-reduce engine over AMPQ
+Poopy - An unusable map-reduce engine over AMQP
 -----------------------------------------------
 
 Install
@@ -25,12 +25,12 @@ Install
 **Running**
 
 #. Open two consoles (consoleA, consoleB)
-#. In *consoleB* run ``poopy deploy ampq://localhost``
+#. In *consoleB* run ``poopy deploy amqp://localhost``
 #. In *consoleA* execute
-   ``poopy upload ampq://localhost path/to/iris.arff poopFS://iris.arff``
+   ``poopy upload amqp://localhost path/to/iris.arff poopFS://iris.arff``
    now your file are uploaded to the "distributed file sistem"
 #. In *consoleA* run
-   ``poopy run ampq://localhost path/to/randomforest.py Script out``
+   ``poopy run amqp://localhost path/to/randomforest.py Script out``
 #. Your output model are serialized in out/localtime
 
 
