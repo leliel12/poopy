@@ -1,6 +1,5 @@
-
-Poopy - An unusable map-reduce engine over AMQP
------------------------------------------------
+Poopy - map-reduce engine over AMQP
+---------------------------------------------------
 
 Install
 ^^^^^^^
@@ -56,4 +55,3 @@ TODO:
 - More output formats than b64-pkl.
 - Not use the central node as main memory.
 - Reorder some modules into packages
-
